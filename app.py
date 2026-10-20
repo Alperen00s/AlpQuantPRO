@@ -1,3 +1,15 @@
+"""
+AlpQuant v3.5 — Evrensel Çoklu Varlık Veri Çekici (data_fetcher.py)
+===================================================================
+Tek bir kuruma bağlı kalmaksızın, SPK Risk Seviyeleri (Seviye 1 - 5) kapsamındaki
+TÜM yerel ve küresel varlık sınıflarına erişen birleşik veri katmanı:
+  - Seviye 1 (Çok Düşük Risk): Para Piyasası Fonları (TI1, BGP, RPP), TLREF/Mevduat, Hazine Bonosu/Sukuk, Döviz & Gram Altın/Gümüş
+  - Seviye 2 (Düşük Risk)    : Eurobond & Borçlanma Araçları Fonları (DBH, AKE, IPV, KSV), ABD Hazine Tahvili ETF'leri (SHY, IEF, TLT)
+  - Seviye 3 (Orta Risk)     : BIST 30 Mavi Çip Hisselerin Tamamı (TradingView Canlı Tarama), TEFAS Altın/Değişken Fonlar (TTA, TCD, GMA, KZL), Küresel Endeks ETF'leri (SPY, VOO, URTH, GLD, SPUS)
+  - Seviye 4 (Yüksek Risk)   : BIST 100 & 15 Sektör Büyüme Hisselerinin Tamamı (100+ Hisse), TEFAS Hisse Yoğun & Yabancı Teknoloji Fonları (MAC, NNF, IIH, TI2, AFT, YAY, TTE, KPC), Küresel Teknoloji ETF & Hisseleri (QQQ, SMH, NVDA, MSFT, AAPL)
+  - Seviye 5 (Çok Yüksek Risk): Kripto Varlıklar (BTC-USD, ETH-USD, SOL-USD, AVAX-USD), Kaldıraçlı/Tematik ETF'ler (TQQQ, SOXL, ARKK), Serbest Fonlar (IPB, KAV), GSYF ve Yüksek Beta (Beta > 1.35) BIST Yan Tahta/Momentum Payları
+"""
+
 from __future__ import annotations
 import dataclasses
 from email.mime.multipart import MIMEMultipart
@@ -11,7 +23,8 @@ from typing import Tuple
 
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+import datetime as dt
+from datetime import timezone
 from enum import Enum
 import logging
 from typing import Any, Dict, List, Optional
@@ -630,7 +643,7 @@ class MarketSnapshot:
     rsi_tv: Optional[float] = None
     macd_signal_tv: Optional[str] = None
     trend_tv: Optional[str] = None
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: dt.datetime.now(timezone.utc).isoformat())
 
 
 class MultiAssetDataFetcher:
@@ -678,7 +691,7 @@ class MultiAssetDataFetcher:
     ) -> pd.DataFrame:
         seed = sum(ord(c) for c in symbol) % 10000
         rng = np.random.default_rng(seed)
-        dates = pd.date_range(end=datetime.now(timezone.utc), periods=days, freq="B")
+        dates = pd.date_range(end=dt.datetime.now(timezone.utc), periods=days, freq="B")
 
         vol_map = {1: 0.0020, 2: 0.0045, 3: 0.014, 4: 0.020, 5: 0.032}
         daily_vol = vol_map.get(risk_level, 0.016)
@@ -1350,7 +1363,7 @@ class DecisionSignal:
     stop_loss_price: float
     take_profit_price: float
     rationale: List[str]
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: dt.datetime.now(timezone.utc).isoformat())
 
 
 class AlpQuantDecisionEngine:
@@ -1651,7 +1664,7 @@ class EmailSignalNotifier:
                     <b>Yatırımcı SPK Risk Skoru:</b> {suitability.risk_score}/5 |
                     <b>Onaylı Seviyeler:</b> {suitability.approved_levels} |
                     <b>Evren Modu:</b> {"Sadece Katılım" if suitability.participation_only else "Tüm Piyasa (Konvansiyonel + Katılım)"} |
-                    <b>Tarih:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}
+                    <b>Tarih:</b> {dt.datetime.now().strftime('%Y-%m-%d %H:%M')}
                 </p>
             </div>
             <table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:13px;">
@@ -1692,7 +1705,7 @@ class EmailSignalNotifier:
             )
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"📊 AlpQuant Çoklu Varlık Karar Sinyalleri ({datetime.now().strftime('%d.%m.%Y %H:%M')})"
+        msg["Subject"] = f"📊 AlpQuant Çoklu Varlık Karar Sinyalleri ({dt.datetime.now().strftime('%d.%m.%Y %H:%M')})"
         msg["From"] = sender_email
         msg["To"] = recipient_email
         msg.attach(MIMEText(html_body, "html", "utf-8"))
@@ -1712,7 +1725,6 @@ class EmailSignalNotifier:
 # 6. STREAMLIT EVRENSEL ÇOKLU VARLIK SÜPER-TERMİNALİ (`app.py`)
 # ============================================================================
 
-import datetime
 import tempfile
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
@@ -1834,7 +1846,7 @@ def generate_pdf_file(hisse: str, veri_dict: Dict[str, Any]) -> bytes:
     pdf.cell(
         0,
         8,
-        tr2eng(f"Symbol: {hisse}  |  Sector: {veri_dict.get('Sector', '')}  |  Date: {datetime.date.today()}"),
+        tr2eng(f"Symbol: {hisse}  |  Sector: {veri_dict.get('Sector', '')}  |  Date: {dt.date.today()}"),
         ln=1,
         align="C",
     )
@@ -2208,7 +2220,7 @@ with tab_kap:
                 company_name=yeni_sembol,
                 title=yeni_baslik,
                 summary_text=yeni_metin,
-                published_at=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                published_at=dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
             )
             st.session_state.custom_kap_list.insert(0, new_disc)
             st.rerun()
