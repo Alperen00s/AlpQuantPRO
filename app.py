@@ -1746,45 +1746,109 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .stApp { background-color: #131722; color: #D1D4DC; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    [data-testid="stSidebar"] { background-color: #1E222D !important; border-right: 1px solid #2A2E39; }
+    /* Global Background & Institutional Dark Theme */
+    .stApp {
+        background-color: #0B0E14 !important;
+        color: #D1D4DC !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    }
+    [data-testid="stSidebar"] {
+        background-color: #10141E !important;
+        border-right: 1px solid #1E2638 !important;
+    }
+    
+    /* Headings & Text */
     h1, h2, h3, h4 { color: #FFFFFF !important; font-weight: 600 !important; }
     p, span, div { color: #D1D4DC; }
-    [data-testid="stMetricValue"] { color: #FFFFFF !important; font-size: 1.65rem !important; font-weight: 700; }
-    [data-testid="stMetricLabel"] { color: #9BA0AE !important; font-size: 0.85rem !important; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    /* Connected Institutional Segmented Tab Bar */
+    div[data-baseweb="tab-list"] {
+        gap: 6px;
+        background-color: #121722 !important;
+        padding: 6px 8px !important;
+        border-radius: 12px !important;
+        border: 1px solid #1E2638 !important;
+        margin-bottom: 1.2rem !important;
+    }
+    button[data-baseweb="tab"] {
+        border-radius: 8px !important;
+        padding: 8px 20px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        color: #8E95A5 !important;
+        border: none !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        background-color: transparent !important;
+    }
+    button[data-baseweb="tab"]:hover {
+        color: #FFFFFF !important;
+        background-color: rgba(41, 98, 255, 0.12) !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #FFFFFF !important;
+        background: linear-gradient(135deg, #2962FF 0%, #1E53E5 100%) !important;
+        box-shadow: 0 4px 14px rgba(41, 98, 255, 0.38) !important;
+    }
+    div[data-baseweb="tab-border"] { display: none !important; }
+    div[data-baseweb="tab-highlight"] { display: none !important; }
+    
+    /* Metric Cards */
+    [data-testid="stMetric"] {
+        background: #121722 !important;
+        border: 1px solid #1E2638 !important;
+        border-radius: 10px !important;
+        padding: 12px 16px !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #FFFFFF !important;
+        font-size: 1.55rem !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #8E95A5 !important;
+        font-size: 0.78rem !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.5px !important;
+        text-transform: uppercase !important;
+    }
+    
+    /* Interactive Buttons */
     .stButton > button {
-        background-color: #2962FF !important; color: #FFFFFF !important;
-        border: none !important; border-radius: 6px !important;
-        transition: background-color 0.2s ease !important; font-weight: 600 !important;
+        background: linear-gradient(135deg, #2962FF 0%, #1E53E5 100%) !important;
+        color: #FFFFFF !important;
+        border: 1px solid #3D7BFF !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        box-shadow: 0 2px 8px rgba(41, 98, 255, 0.25) !important;
+        transition: all 0.2s ease !important;
     }
-    .stButton > button:hover { background-color: #1E53E5 !important; }
-    hr { border-color: #2A2E39 !important; margin-top: 0.8rem; margin-bottom: 0.8rem; }
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #1E53E5 0%, #1541B8 100%) !important;
+        box-shadow: 0 4px 14px rgba(41, 98, 255, 0.45) !important;
+    }
+    
+    /* Cards & Badges */
     .aq-card {
-        background: linear-gradient(135deg, #1E222D 0%, #161C2E 100%);
-        border: 1px solid #2A2E39;
-        border-left: 5px solid #2962FF;
-        border-radius: 10px;
-        padding: 18px;
-        margin-bottom: 14px;
+        background: linear-gradient(135deg, #131826 0%, #0F131E 100%);
+        border: 1px solid #1E2638;
+        border-left: 4px solid #2962FF;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-bottom: 12px;
     }
-    .aq-badge-ok {
-        background-color: rgba(8, 153, 129, 0.2);
-        color: #00E6B8;
-        border: 1px solid #089981;
-        padding: 4px 12px;
-        border-radius: 16px;
-        font-weight: 700;
-        font-size: 13px;
+    .aq-badge-filter {
+        display: inline-block;
+        background: rgba(41, 98, 255, 0.15);
+        color: #70A1FF;
+        border: 1px solid rgba(41, 98, 255, 0.35);
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-right: 6px;
+        margin-bottom: 6px;
     }
-    .aq-badge-lock {
-        background-color: rgba(242, 54, 69, 0.2);
-        color: #FF6B78;
-        border: 1px solid #F23645;
-        padding: 4px 12px;
-        border-radius: 16px;
-        font-weight: 700;
-        font-size: 13px;
-    }
+    hr { border-color: #1E2638 !important; margin-top: 0.8rem; margin-bottom: 0.8rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -1888,91 +1952,143 @@ def generate_pdf_file(hisse: str, veri_dict: Dict[str, Any]) -> bytes:
         pass
     return pdf_bytes
 
-st.sidebar.markdown("<h3 style='text-align: center; color: #FFFFFF;'>⚙️ AlpQuant Komuta Merkezi</h3>", unsafe_allow_html=True)
-st.sidebar.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
+st.sidebar.markdown(
+    """
+    <div style='text-align: center; padding: 6px 0 12px 0;'>
+        <h3 style='margin:0; color:#FFFFFF; font-size:21px; font-weight:700;'>AlpQuant Pro</h3>
+        <span style='color:#2962FF; font-size:11px; font-weight:600; letter-spacing:1px;'>INSTITUTIONAL SCREENER & BOT</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+st.sidebar.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
 
-with st.sidebar.expander("🌐 Varlık Evreni & Hızlı Risk Kalibrasyonu", expanded=True):
+# --- 1. VARLIK SINIFI SEÇİMİ ---
+with st.sidebar.expander("🌐 1. Varlık Sınıfı & Piyasa Evreni", expanded=True):
+    varlik_grubu = st.selectbox(
+        "Varlık Grubu",
+        [
+            "🌐 Tüm Varlıklar (Çoklu Varlık Portföyü)",
+            "🇹🇷 Borsa İstanbul (BIST Payları)",
+            "🏛️ TEFAS Yatırım Fonları",
+            "🇺🇸 Küresel ETF & ABD Hisseleri",
+            "🥇 Döviz & Kıymetli Madenler",
+            "⚡ Kripto & Kaldıraçlı Varlıklar",
+        ],
+        index=0,
+    )
+    sadece_katilim_filtre = st.checkbox("☪️ Sadece Katılım Finans Uyumlu (Faizsiz)", value=False)
+    st.session_state.suitability_profile.participation_only = sadece_katilim_filtre
+
+# --- 2. DİNAMİK SEKTÖR & ENDEKS SEÇİMİ (v1 Tarzı) ---
+with st.sidebar.expander("📌 2. Sektör & Endeks Seçimi", expanded=True):
+    is_bist = ("Borsa İstanbul" in varlik_grubu or "Tüm Varlıklar" in varlik_grubu)
+    if is_bist:
+        endeks_secimi = st.radio(
+            "BIST Endeksi",
+            ("Tüm BIST Evreni", "BIST 30 Mavi Çip", "BIST 100", "BIST Katılım"),
+            index=0,
+        )
+        sektor_secimi = st.multiselect(
+            "Sektör Seçimi (Çoklu)",
+            options=list(SEKTOR_SOZLUGU.keys()),
+            placeholder="Tüm Sektörler",
+        )
+    else:
+        endeks_secimi = "Tüm BIST Evreni"
+        sektor_secimi = []
+        st.caption("ℹ️ BIST dışındaki varlık sınıflarında küresel/fon taksonomisi uygulanır.")
+
+# --- 3. TEMEL ANALİZ FİLTRELERİ (v1 Tarzı) ---
+with st.sidebar.expander("📊 3. Temel Analiz & Değerleme", expanded=False):
+    fk_filtre_aktif = st.checkbox("Maksimum F/K Filtresi Uygula", value=False)
+    fk_max = st.slider("Maksimum F/K (P/E)", min_value=1.0, max_value=80.0, value=30.0, step=1.0)
+    
+    pddd_filtre_aktif = st.checkbox("Maksimum PD/DD Filtresi Uygula", value=False)
+    pddd_max = st.slider("Maksimum PD/DD (P/B)", min_value=0.5, max_value=25.0, value=8.0, step=0.5)
+    
+    roe_filtre_aktif = st.checkbox("Minimum ROE (%) Filtresi Uygula", value=False)
+    roe_min = st.slider("Minimum Özsermaye Kârlılığı (ROE %)", min_value=0.0, max_value=70.0, value=15.0, step=1.0)
+    
+    eksik_verileri_goster = st.checkbox("Eksik Verileri (N/A) Listele", value=True)
+
+# --- 4. TEKNİK & RİSK FİLTRELERİ (v1 Tarzı) ---
+with st.sidebar.expander("📈 4. Teknik & Karar Sinyali Filtreleri", expanded=False):
+    rsi_aralik = st.slider("RSI (14) Aralığı", min_value=10, max_value=90, value=(15, 85))
+    sadece_trend = st.checkbox("Sadece Yükselen Trend (Fiyat >= SMA50)", value=False)
+    sadece_macd_al = st.checkbox("Sadece MACD Pozitif (Bull) Kesişimi", value=False)
+    sinyal_filtre_secimi = st.selectbox(
+        "Karar Sinyali Filtresi",
+        ["Tüm Sinyaller", "Sadece AL & GÜÇLÜ AL", "Sadece GÜÇLÜ AL", "Sadece TUT / İZLE"],
+        index=0,
+    )
+    min_karar_skoru = st.slider("Minimum Bileşik Karar Skoru", min_value=0.0, max_value=95.0, value=0.0, step=5.0)
+
+# --- 5. SERMAYE & SİNYAL BOTU AYARLARI ---
+with st.sidebar.expander("💼 5. Portföy Sermayesi & Ayarlar", expanded=False):
     portfoy_bakiye = st.number_input(
-        "Toplam Portföy Sermayesi (TL)",
+        "Portföy Sermayesi (TL)",
         min_value=10_000.0,
         max_value=50_000_000.0,
         value=250_000.0,
         step=10_000.0,
     )
-    evren_modu = st.radio(
-        "Piyasa Evreni Kapsamı",
-        ("🌐 Tüm Piyasa (Konvansiyonel + Katılım)", "☪️ Sadece Katılım Finans Uyumlu"),
-        index=0,
-    )
-    sadece_katilim_filtre = evren_modu.startswith("☪️")
-
-    hizli_risk = st.slider(
-        "Hızlı SPK Risk Skoru (1=Çok Düşük, 5=Tüm Evren/Agresif)",
-        min_value=1,
-        max_value=5,
-        value=st.session_state.suitability_profile.risk_score,
-    )
-    if st.button("⚡ Risk Profilini ve Evreni Güncelle"):
-        ans_quick = {
-            i: {
-                "bilgi": "Yeterince bilgim var",
-                "siklik": "Haftada birkaç kez",
-                "hacim": "500.001 TL ve üzeri",
-            }
-            for i in range(1, 6)
-        }
-        st.session_state.suitability_profile = UniversalSuitabilityEngine.evaluate(
-            user_id="alperen_gulluoglu",
-            risk_skoru=hizli_risk,
-            answers=ans_quick,
-            participation_only=sadece_katilim_filtre,
-        )
-        st.toast(f"Risk Profili Seviye {hizli_risk}/5 ({evren_modu}) olarak güncellendi!", icon="✅")
-
-    st.session_state.suitability_profile.participation_only = sadece_katilim_filtre
     canli_veri_aktif = st.checkbox("Canlı Veri Akışı (TradingView / yfinance)", value=True)
     tum_bist_tara = st.checkbox("TradingView BIST 100 Tüm Hisseleri Dinamik Ekle", value=True)
-
-with st.sidebar.expander("🧠 Gemini AI (KAP Analiz Motoru)", expanded=False):
-    gemini_api_key = st.text_input(
-        "Google Gemini API Key",
-        value=os.environ.get("GEMINI_API_KEY", ""),
-        type="password",
-        help="Girildiğinde KAP bildirimleri gemini-2.5-flash modeli ve kural motoru ile hibrit analiz edilir.",
-    )
+    
+    gemini_api_key = st.text_input("Gemini API Key", value=os.environ.get("GEMINI_API_KEY", ""), type="password")
     gemini_model = st.selectbox("Gemini Modeli", ["gemini-2.5-flash", "gemini-2.5-pro"], index=0)
+    alici_eposta = st.text_input("Alıcı E-Posta", value="alperengulluoglu@gmail.com")
+    gonderici_eposta = st.text_input("Gönderici E-Posta", value="alperengulluoglu@gmail.com")
+    smtp_sifre = st.text_input("Gmail App Password", value=os.environ.get("SMTP_APP_PASSWORD", ""), type="password")
 
-with st.sidebar.expander("📧 E-Posta Sinyal Bildirim Hattı", expanded=False):
-    alici_eposta = st.text_input("Alıcı E-Posta Adresi", value="alperengulluoglu@gmail.com")
-    gonderici_eposta = st.text_input("Gönderici Gmail Adresi", value="alperengulluoglu@gmail.com")
-    smtp_sifre = st.text_input(
-        "Gmail Uygulama Şifresi (App Password)",
-        value=os.environ.get("SMTP_APP_PASSWORD", ""),
-        type="password",
-    )
-
+# --- 6. EN ALTTA: SPK YATIRIM TESTİ & SİSTEM HAFIZASI ---
+st.sidebar.markdown("<hr style='margin: 14px 0 8px 0;'>", unsafe_allow_html=True)
 prof: SuitabilityProfile = st.session_state.suitability_profile
-st.markdown(
-    "<h2 style='margin-bottom: 2px;'>AlpQuant v3.5 <span style='color: #2962FF; font-size: 18px; font-weight: 500;'>| Evrensel Çoklu Varlık Karar Motoru, KAP AI & Otomatik İşlem Botu</span></h2>",
-    unsafe_allow_html=True,
-)
-st.caption(
-    f"Aktif SPK Risk Skoru: **{prof.risk_score} / 5**  |  "
-    f"Onaylı Varlık Seviyeleri: **{prof.approved_levels}**  |  "
-    f"Evren: **{'Sadece Katılım' if prof.participation_only else 'Tüm Piyasa (BIST, TEFAS, Küresel ETF/Hisse, Eurobond, Altın/Döviz, Kripto)'}**  |  "
-    f"Sermaye: **{portfoy_bakiye:,.0f} TL**"
-)
-st.markdown("<hr style='margin-top: 4px;'>", unsafe_allow_html=True)
+with st.sidebar.expander("🧭 SPK Yatırım Uygunluk Testi & Hafıza", expanded=False):
+    st.markdown(
+        f"""
+        <div style='background:rgba(41,98,255,0.12); border-left:3px solid #2962FF; padding:10px 12px; border-radius:6px; font-size:12.5px; margin-bottom:10px;'>
+            <b>Kayıtlı Risk Seviyeniz:</b> Seviye {prof.risk_score} / 5<br>
+            <b>Onaylı Seviyeler:</b> {prof.approved_levels}<br>
+            <b>Sistem Hafızası:</b> 💾 Oturumda Kayıtlı
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption("Testi her seferinde çözmek zorunda değilsiniz. Risk profilinizi revize etmek için aşağıdaki formu kullanabilirsiniz:")
+    with st.form("sidebar_spk_form"):
+        yeni_risk_skoru = st.select_slider(
+            "Yatırımcı Risk İştahı (1 = Çok Düşük, 5 = Agresif / Tüm Piyasa)",
+            options=[1, 2, 3, 4, 5],
+            value=prof.risk_score,
+        )
+        yas_secim = st.selectbox("Yaş Aralığı", ["18-30 Yaş", "31-50 Yaş", "51-65 Yaş", "66 ve üzeri"], index=0)
+        tecrube_secim = st.selectbox("Yatırım Tecrübesi", ["1 yıldan az", "1-4 yıl", "5-10 yıl", "10 yıldan fazla"], index=1)
+        bilgi_seviyesi = st.selectbox(
+            "Piyasa Araçları Bilgi Düzeyi",
+            ["Yeterince bilgim var (Bilanço & Fiyatlama)", "Bilgim kısıtlı", "Bilgim yok"],
+            index=0,
+        )
+        if st.form_submit_button("💾 Uygunluk Profilini Güncelle"):
+            ans_custom = {
+                i: {
+                    "bilgi": bilgi_seviyesi,
+                    "siklik": "Haftada birkaç kez" if yeni_risk_skoru >= 4 else "Ayda birkaç kez",
+                    "hacim": "500.001 TL ve üzeri" if yeni_risk_skoru >= 4 else "50.001 TL - 500.000 TL",
+                }
+                for i in range(1, 6)
+            }
+            st.session_state.suitability_profile = UniversalSuitabilityEngine.evaluate(
+                user_id="alperen_gulluoglu",
+                risk_skoru=yeni_risk_skoru,
+                answers=ans_custom,
+                participation_only=sadece_katilim_filtre,
+            )
+            st.toast(f"SPK Profili Seviye {yeni_risk_skoru}/5 olarak güncellendi ve hafızaya kaydedildi!", icon="✅")
+            st.rerun()
 
-tab_market, tab_karar, tab_test, tab_varliklar, tab_kap, tab_screener = st.tabs([
-    "📈 1. Canlı Piyasa & Endeks Grafikleri (Market Overview)",
-    "🤖 2. Evrensel Karar Motoru & Sinyal Botu",
-    "🧭 3. SPK Yatırım Uygunluk & Risk Testi",
-    "🌍 4. Çoklu Varlık Evreni (Seviye 1-5 Tüm Araçlar)",
-    "📰 5. KAP Bildirim & Gemini AI Analizörü",
-    "📊 6. Tarihsel Backtest & Mum Grafiği / PDF",
-])
-
+# --- VERİLERİ ÇEK & ANALİZ ET ---
 fetcher = MultiAssetDataFetcher(
     prefer_live_data=canli_veri_aktif,
     include_all_bist_from_tv=tum_bist_tara,
@@ -1995,11 +2111,144 @@ all_signals: List[DecisionSignal] = [
     decision_engine.evaluate_asset(snap, kap_results_by_symbol.get(sym))
     for sym, snap in universe_snapshots.items()
 ]
+signals_by_symbol = {s.symbol: s for s in all_signals}
 
+# --- SOL MENÜ FİLTRELEME MOTORU ---
+def passes_filters(snap: MarketSnapshot, sig: DecisionSignal) -> bool:
+    # 1. Varlık Grubu Filtresi
+    if "Borsa İstanbul" in varlik_grubu:
+        if snap.asset_class not in (AssetClass.BIST_BLUECHIP_30, AssetClass.BIST_GROWTH_100, AssetClass.BIST_HIGH_BETA):
+            return False
+    elif "TEFAS" in varlik_grubu:
+        if snap.asset_class not in (AssetClass.TEFAS_MUTUAL_FUND, AssetClass.MONEY_MARKET_DEPOSIT) or snap.symbol in ("USDTRY", "XAU_TRY", "XAG_TRY", "TR_HAZINE_BONO"):
+            return False
+    elif "Küresel ETF" in varlik_grubu:
+        if snap.asset_class != AssetClass.GLOBAL_ETF_EQUITY:
+            return False
+    elif "Döviz & Kıymetli" in varlik_grubu:
+        if snap.asset_class not in (AssetClass.FOREX_PRECIOUS_METALS, AssetClass.BONDS_EUROBOND_SUKUK) or snap.symbol in ("DBH", "AKE", "IPV"):
+            return False
+    elif "Kripto & Kaldıraçlı" in varlik_grubu:
+        if snap.asset_class not in (AssetClass.CRYPTO_LEVERAGED_HEDGE, AssetClass.BIST_HIGH_BETA):
+            return False
 
-with tab_market:
-    st.subheader("📈 Canlı Piyasa Genel Bakış (BIST 100, BIST 30 & Küresel Varlıklar)")
-    st.caption("AlpQuant v1 açılış paneli: Anlık endeks seviyeleri, 6 aylık tepe/dip bantları, 50 günlük hareketli ortalama trend analizi ve interaktif mum grafikleri:")
+    # 2. Katılım Finans Filtresi
+    if sadece_katilim_filtre and not snap.is_participation_compliant:
+        return False
+
+    # 3. BIST Endeks ve Sektör Filtreleri
+    if snap.asset_class in (AssetClass.BIST_BLUECHIP_30, AssetClass.BIST_GROWTH_100, AssetClass.BIST_HIGH_BETA):
+        if endeks_secimi == "BIST 30 Mavi Çip" and snap.symbol not in BIST_30:
+            return False
+        elif endeks_secimi == "BIST 100" and snap.symbol not in BIST_30 and snap.symbol not in KATILIM_TUM and snap.asset_class != AssetClass.BIST_GROWTH_100:
+            return False
+        elif endeks_secimi == "BIST Katılım" and not snap.is_participation_compliant:
+            return False
+
+        if sektor_secimi:
+            is_in_selected_sector = False
+            for sec in sektor_secimi:
+                if sec == snap.sector or snap.symbol in SEKTOR_SOZLUGU.get(sec, []):
+                    is_in_selected_sector = True
+                    break
+            if not is_in_selected_sector:
+                return False
+
+    # 4. Temel Analiz Filtreleri
+    if fk_filtre_aktif:
+        if snap.pe_ratio is None:
+            if not eksik_verileri_goster:
+                return False
+        elif snap.pe_ratio > fk_max:
+            return False
+
+    if pddd_filtre_aktif:
+        if snap.pb_ratio is None:
+            if not eksik_verileri_goster:
+                return False
+        elif snap.pb_ratio > pddd_max:
+            return False
+
+    if roe_filtre_aktif:
+        if snap.roe_pct is None:
+            if not eksik_verileri_goster:
+                return False
+        elif snap.roe_pct < roe_min:
+            return False
+
+    # 5. Teknik Filtreler
+    m = QuantitativeIndicators.compute_metrics(snap.ohlcv_history)
+    rsi_val = snap.rsi_tv if snap.rsi_tv is not None else m["rsi_14"]
+    if not (rsi_aralik[0] <= rsi_val <= rsi_aralik[1]):
+        return False
+
+    if sadece_trend:
+        sma50_val = snap.ohlcv_history["Close"].rolling(50, min_periods=5).mean().iloc[-1]
+        if snap.current_price < sma50_val and snap.trend_tv != "🚀 Up":
+            return False
+
+    if sadece_macd_al:
+        if snap.macd_signal_tv != "🟢 Bull" and m["macd_hist"] <= 0:
+            return False
+
+    # 6. Sinyal ve Skor Filtreleri
+    if min_karar_skoru > 0 and sig.composite_score < min_karar_skoru:
+        return False
+
+    if sinyal_filtre_secimi == "Sadece AL & GÜÇLÜ AL" and sig.action not in (SignalAction.STRONG_BUY, SignalAction.BUY):
+        return False
+    elif sinyal_filtre_secimi == "Sadece GÜÇLÜ AL" and sig.action != SignalAction.STRONG_BUY:
+        return False
+    elif sinyal_filtre_secimi == "Sadece TUT / İZLE" and sig.action != SignalAction.HOLD:
+        return False
+
+    return True
+
+filtered_pairs = [
+    (snap, signals_by_symbol[sym])
+    for sym, snap in universe_snapshots.items()
+    if sym in signals_by_symbol and passes_filters(snap, signals_by_symbol[sym])
+]
+filtered_snapshots = {snap.symbol: snap for snap, _ in filtered_pairs}
+filtered_signals = [sig for _, sig in filtered_pairs]
+
+# --- ÜST MAKRO VE CANLI PİYASA ŞERİDİ (TICKER TAPE) ---
+st.markdown(
+    f"""
+    <div style="background: linear-gradient(90deg, #101522 0%, #151C2C 100%); border: 1px solid #1E2638; border-radius: 10px; padding: 12px 18px; margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; font-size: 13.5px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+        <div>
+            <span style="font-weight:700; color:#FFFFFF; font-size:16px;">AlpQuant Pro</span>
+            <span style="color:#787B86; margin: 0 8px;">|</span>
+            <span style="color:#00E6B8; font-weight:600;">🟢 PİYASA CANLI AKIŞ</span>
+        </div>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center;">
+            <span>🇹🇷 <b>BIST 100:</b> 9,250.40 <span style='color:#00E6B8;'>+1.25%</span></span>
+            <span>💎 <b>BIST 30:</b> 10,180.15 <span style='color:#00E6B8;'>+1.42%</span></span>
+            <span>🇺🇸 <b>S&P 500:</b> 585.00 <span style='color:#00E6B8;'>+0.38%</span></span>
+            <span>🥇 <b>Gram Altın:</b> 3,050 TL <span style='color:#00E6B8;'>+0.75%</span></span>
+            <span>⚡ <b>Bitcoin:</b> $68,500 <span style='color:#00E6B8;'>+2.10%</span></span>
+            <span style="background:rgba(41,98,255,0.2); border:1px solid #2962FF; color:#70A1FF; padding:2px 8px; border-radius:12px; font-weight:600; font-size:12px;">🛡️ SPK Seviye {prof.risk_score}</span>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# --- BİRLEŞİK SEGMENTLİ İŞLEM MASALARI ---
+tab_terminal, tab_signals, tab_screener, tab_kap, tab_quant = st.tabs([
+    "📊 Piyasa Terminali",
+    "⚡ Karar Motoru & Sinyaller",
+    "🎯 Çoklu Varlık Taraması",
+    "🧠 KAP AI İstihbarat Masası",
+    "🔬 Kantitatif Backtest & PDF",
+])
+
+# ============================================================================
+# MASA 1: CANLI PİYASA & ENDEKS TERMİNALİ
+# ============================================================================
+with tab_terminal:
+    st.subheader("📊 Canlı Piyasa Genel Bakış & Endeks Grafikleri")
+    st.caption("Açılış paneli: Anlık endeks seviyeleri, 6 aylık tepe/dip bantları, 50 günlük hareketli ortalama trend analizi ve interaktif mum grafikleri:")
 
     sub_t1, sub_t2, sub_t3, sub_t4, sub_t5 = st.tabs([
         "🇹🇷 BIST 100 (XU100)",
@@ -2041,7 +2290,7 @@ with tab_market:
             commentary += f"Fiyat 6 aylık zirvesinin **%{dist_to_high:.1f}** altında dengeli işlem görmektedir."
         
         st.markdown(
-            f"<div style='background-color:#1E222D; padding:14px 18px; border-radius:8px; border-left: 4px solid #2962FF; margin-top:10px; margin-bottom: 18px; color: #D1D4DC; font-size: 14.5px;'>{commentary}</div>",
+            f"<div style='background-color:#121722; padding:14px 18px; border-radius:8px; border-left: 4px solid #2962FF; margin-top:10px; margin-bottom: 18px; color: #D1D4DC; font-size: 14.5px;'>{commentary}</div>",
             unsafe_allow_html=True
         )
 
@@ -2062,10 +2311,10 @@ with tab_market:
                 mode='lines', line=dict(color='#FF9800', width=1.5), name='SMA 50'
             ))
         fig_idx.update_layout(
-            template="plotly_dark", paper_bgcolor="#131722", plot_bgcolor="#131722",
+            template="plotly_dark", paper_bgcolor="#0B0E14", plot_bgcolor="#0B0E14",
             margin=dict(l=10, r=10, t=10, b=10), xaxis_rangeslider_visible=False,
-            xaxis=dict(showgrid=True, gridcolor="#2A2E39"),
-            yaxis=dict(showgrid=True, gridcolor="#2A2E39", side="right"),
+            xaxis=dict(showgrid=True, gridcolor="#1E2638"),
+            yaxis=dict(showgrid=True, gridcolor="#1E2638", side="right"),
             height=480,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
@@ -2106,213 +2355,131 @@ with tab_market:
         btc_df = safe_get_market_index_data("BTC-USD", "BTC-USD", 68500.0, risk_level=5)
         render_dashboard(btc_df, "Bitcoin (BTC/USD)", "USD")
 
-with tab_karar:
-    st.subheader("🤖 Otonom Karar Mekanizması (Tüm Piyasa Varlıkları: Seviye 1 - 5)")
-    st.markdown(
-        "Tek bir kuruma bağlı kalmadan; **Para Piyasası Fonları (PPF)**, **Tahvil/Eurobond/Sukuk**, "
-        "**Döviz & Altın/Gümüş**, **Tüm TEFAS Fonları**, **BIST 30 / BIST 100 Hisseleri**, "
-        "**ABD Endeks/Teknoloji ETF & Hisseleri (`SPY`, `QQQ`, `NVDA`)** ve **Kripto / Kaldıraçlı Varlıkları (`BTC`, `ETH`, `SOL`, `TQQQ`)** "
-        "tarayarak anlık sinyal, ATR Stop-Loss / Take-Profit ve pozisyon büyüklüğü üretir."
-    )
+# ============================================================================
+# MASA 2: KARAR MOTORU & SİNYAL MASASI
+# ============================================================================
+with tab_signals:
+    st.subheader("⚡ Otonom Karar Motoru & Sinyal Masası")
+    
+    # Aktif filtreleme etiketleri
+    filter_tags = [f"<span class='aq-badge-filter'>Evren: {varlik_grubu.split(' ')[1] if ' ' in varlik_grubu else varlik_grubu}</span>"]
+    if is_bist and endeks_secimi != "Tüm BIST Evreni":
+        filter_tags.append(f"<span class='aq-badge-filter'>Endeks: {endeks_secimi}</span>")
+    if is_bist and sektor_secimi:
+        filter_tags.append(f"<span class='aq-badge-filter'>Sektörler: {', '.join(sektor_secimi[:3])}{'...' if len(sektor_secimi)>3 else ''}</span>")
+    if sadece_katilim_filtre:
+        filter_tags.append("<span class='aq-badge-filter'>☪️ Sadece Katılım</span>")
+    if fk_filtre_aktif:
+        filter_tags.append(f"<span class='aq-badge-filter'>F/K &le; {fk_max}</span>")
+    if pddd_filtre_aktif:
+        filter_tags.append(f"<span class='aq-badge-filter'>PD/DD &le; {pddd_max}</span>")
+    if roe_filtre_aktif:
+        filter_tags.append(f"<span class='aq-badge-filter'>ROE &ge; %{roe_min}</span>")
+    if rsi_aralik != (10, 90):
+        filter_tags.append(f"<span class='aq-badge-filter'>RSI: {rsi_aralik[0]}-{rsi_aralik[1]}</span>")
+    if sinyal_filtre_secimi != "Tüm Sinyaller":
+        filter_tags.append(f"<span class='aq-badge-filter'>{sinyal_filtre_secimi}</span>")
+    if min_karar_skoru > 0:
+        filter_tags.append(f"<span class='aq-badge-filter'>Min Skor: {min_karar_skoru}</span>")
 
-    seviye_filtre = st.multiselect(
-        "Risk Seviyesine Göre Filtrele",
-        options=[1, 2, 3, 4, 5],
-        default=prof.approved_levels,
-        format_func=lambda x: f"Seviye {x}",
-    )
+    st.markdown(f"<div style='margin-bottom:12px;'>{' '.join(filter_tags)}</div>", unsafe_allow_html=True)
 
-    filtered_signals = [s for s in all_signals if s.risk_level in seviye_filtre]
     buy_signals = [s for s in filtered_signals if s.action in (SignalAction.STRONG_BUY, SignalAction.BUY)]
     restricted_signals = [
         s for s in filtered_signals
         if s.action in (SignalAction.RESTRICTED_SPK, SignalAction.FILTERED_PARTICIPATION, SignalAction.VETO_KAP)
     ]
+    avg_score = float(np.mean([s.composite_score for s in filtered_signals])) if filtered_signals else 0.0
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Taranan Evrensel Varlık", f"{len(filtered_signals)}")
+    m1.metric("Kriterlere Uyan Varlık", f"{len(filtered_signals)}")
     m2.metric("Aktif AL / GÜÇLÜ AL Sinyali", f"{len(buy_signals)}")
-    m3.metric("SPK Onaylı Seviyeleriniz", f"{prof.approved_levels}")
+    m3.metric("Filtrelenen Ortalama Skor", f"{avg_score:.1f} / 100")
     m4.metric("Kısıtlı / Veto Varlık", f"{len(restricted_signals)}")
 
-    signal_rows = []
-    for s in sorted(filtered_signals, key=lambda x: x.composite_score, reverse=True):
-        signal_rows.append({
-            "Kod": s.symbol,
-            "Varlık Adı": s.name,
-            "Risk Seviyesi": f"Seviye {s.risk_level}",
-            "Varlık Sınıfı": s.asset_class,
-            "Karar Sinyali": s.action.value,
-            "Bileşik Skor": s.composite_score,
-            "Teknik": s.technical_score,
-            "Temel/TER": s.fundamental_score,
-            "KAP AI": s.kap_sentiment_score,
-            "Anlık Fiyat": f"{s.current_price:,.2f} {s.currency}",
-            "Önerilen Adet": s.recommended_quantity,
-            "Emir Tutarı (TL)": s.recommended_notional_try,
-            "Stop-Loss": s.stop_loss_price,
-            "Take-Profit": s.take_profit_price,
-            "Karar Gerekçesi": " | ".join(s.rationale[:3]),
-        })
-
-    st.dataframe(pd.DataFrame(signal_rows), use_container_width=True, hide_index=True)
-
-    col_mail_btn, _ = st.columns([1, 2])
-    with col_mail_btn:
-        if st.button("📧 Sinyalleri E-Posta Bildirimi Olarak Gönder", use_container_width=True):
-            ok, msg = EmailSignalNotifier.send_email_alert(
-                recipient_email=alici_eposta,
-                suitability=prof,
-                signals=filtered_signals,
-                sender_email=gonderici_eposta,
-                smtp_app_password=smtp_sifre or None,
-            )
-            if ok:
-                st.success(f"✅ {msg}")
-            else:
-                st.info(f"ℹ️ {msg} (Aşağıda hazır HTML e-posta çıktısını inceleyebilirsiniz.)")
-
-    with st.expander("📨 E-Posta Bildirim Raporu Canlı Önizleme (HTML)"):
-        st.components.v1.html(
-            EmailSignalNotifier.build_html_report(prof, filtered_signals),
-            height=420,
-            scrolling=True,
-        )
-
-with tab_test:
-    st.markdown(
-        "<div class='aq-card'><h3 style='margin:0;color:#FFFFFF !important;'>🧭 Evrensel SPK Yatırım Uygunluk ve Risk Profilleme Testi</h3>"
-        "<p style='margin:6px 0 0 0;'>Tek bir kurumun ürünleriyle sınırlı kalmaksızın, <b>Seviye 1'den Seviye 5'e kadar tüm yerel ve küresel yatırım araçlarında</b> (TEFAS Fonları, BIST Hisseleri, Küresel ETF/ABD Hisseleri, Tahvil/Eurobond/Sukuk, Altın/Döviz ve Kripto/Türev) işlem uygunluğunuzu belirler ve Karar Motoruna bağlar.</p></div>",
-        unsafe_allow_html=True,
-    )
-
-    if st.session_state.step == 1:
-        with st.form("etap1_form"):
-            st.subheader("1. Etap: Yatırımcı Bilgileri ve Risk Tercihi")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.selectbox("Yaş", ["Seçiniz", "18-30 Yaş", "31-50 Yaş", "51-65 Yaş", "66 ve üzeri", "Kurumsal Müşteri"], key="yas", index=1)
-                st.selectbox("Eğitim Durumu", ["Seçiniz", "İlköğretim/Ortaöğretim", "Lise", "Lisans ve Üstü", "Kurumsal Müşteri"], key="egitim", index=3)
-            with col2:
-                st.selectbox("Meslek", meslekler_listesi, key="meslek", index=meslekler_listesi.index("Öğrenci"))
-                st.selectbox("Yatırım Değerlendirme Süresi", ["Seçiniz", "Kısa Vadeli (0-1 Yıl)", "Orta Vadeli (1-3 Yıl)", "Uzun Vadeli (3 Yıl ve Üzeri)"], key="sure", index=3)
-
-            st.selectbox("Yatırım Tecrübesi", ["Seçiniz", "1 yıldan az", "1-4 yıl", "5-10 yıl", "10 yıldan fazla"], key="tecrube", index=2)
-            st.subheader("Risk ve Getiri Tercihi Seçimi (100.000 TL Senaryosu)")
-            st.radio(
-                "Senaryo Seçiminiz:",
-                [
-                    "1. 100.000 TL anaparamdan hiç kayıp yaşamak istemem. Para Piyasası Fonları, Mevduat/TLREF ve Kısa Vadeli Bono/Sukuk ile ilerlerim.",
-                    "2. 100.000 TL yatırımımda maksimum %5 geçici düşüşe dayanabilirim. Eurobond, ABD Tahvil ETF (SHY/TLT) ve Borçlanma Fonlarını tercih ederim.",
-                    "3. 100.000 TL yatırımımda uzun vadede %15-%20 dalgalanmaları normal karşılar; BIST 30 Mavi Çip, S&P 500 ETF (SPY) ve Altın/Değişken fonlarda beklerim.",
-                    "4. Yüksek getiri uğruna %30-%40 erimeyi göğüsleyebilirim. BIST 100 Büyüme Hisseleri, TEFAS Hisse/Teknoloji Fonları (MAC, IIH, AFT) ve Nasdaq (QQQ, NVDA) yatırımı yaparım.",
-                    "5. Çok yüksek getiri için yüksek volatilite ve anapara kaybı riskini alır; Kripto (BTC, ETH, SOL), 3x Kaldıraçlı ETF (TQQQ), Serbest Fonlar ve Yüksek Beta hisselerde işlem yaparım.",
-                ],
-                key="risk_tercihi",
-                index=4,
-            )
-            if st.form_submit_button("İleri ➡️ (Ürün Bilgisi ve İşlem Tecrübesi)"):
-                st.session_state.kalici_risk_tercihi = st.session_state.risk_tercihi
-                st.session_state.step = 2
-                st.rerun()
-
-    elif st.session_state.step == 2:
-        st.subheader("2. Etap: 5 Evrensel Risk Seviyesinde Bilgi ve İşlem Tecrübesi")
-        urun_tanimlari = [
-            ("1/5 - Çok Düşük Riskli Varlıklar", "TEFAS Para Piyasası Fonları (TI1, RPP), Mevduat/Katılma, Hazine Bonosu/Sukuk, Spot Altın/Döviz"),
-            ("2/5 - Düşük Riskli Varlıklar", "TEFAS Eurobond & Borçlanma Fonları (DBH, AKE, IPV), ABD Hazine Tahvili ETF'leri (SHY, TLT, SPSK)"),
-            ("3/5 - Orta Riskli Varlıklar", "BIST 30 Mavi Çip Hisseler, TEFAS Altın/Değişken Fonlar (TTA, TCD), Küresel Endeks ETF'leri (SPY, SPUS)"),
-            ("4/5 - Yüksek Riskli Varlıklar", "BIST 100 Büyüme/Sektör Hisseleri, TEFAS Hisse Yoğun/Teknoloji Fonları (MAC, IIH, AFT), Nasdaq & ABD Hisseleri (QQQ, NVDA)"),
-            ("5/5 - Çok Yüksek Riskli Varlıklar", "Kripto Varlıklar (BTC, ETH, SOL), 3x Kaldıraçlı ETF (TQQQ), TEFAS Serbest Fonlar (IPB, KAV), VİOP ve Yüksek Beta Hisseler"),
-        ]
-        with st.form("etap2_form"):
-            for idx, (baslik, alt) in enumerate(urun_tanimlari, start=1):
-                st.markdown(f"**{baslik}** — *{alt}*")
-                st.radio(
-                    f"Seviye {idx} Bilgi Seviyeniz:",
-                    [
-                        "Bilgim yok: Bu ürünlerde daha önce işlem yapmadım.",
-                        "Bilgim kısıtlı: İsimlerini duydum ancak detaylı fiyatlama/bilanço analizi yapamam.",
-                        "Yeterince bilgim var: Getiri/risk mekanizmalarını biliyor ve aktif olarak yönetebiliyorum.",
-                    ],
-                    key=f"bilgi_{idx}",
-                    index=2,
-                )
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.selectbox(f"Seviye {idx} İşlem Sıklığı", ["Yılda birkaç kez", "Ayda birkaç kez", "Haftada birkaç kez"], key=f"siklik_{idx}", index=2)
-                with c2:
-                    st.selectbox(f"Seviye {idx} Hacim (TL)", ["1 TL - 50.000 TL", "50.001 TL - 500.000 TL", "500.001 TL ve üzeri"], key=f"hacim_{idx}", index=2)
-                st.markdown("<hr>", unsafe_allow_html=True)
-
-            if st.form_submit_button("✅ Testi Tamamla ve Tüm Piyasa Evrenini Karar Motoruna Bağla"):
-                r_skor = int(st.session_state.kalici_risk_tercihi[0])
-                ans_dict = {
-                    i: {
-                        "bilgi": st.session_state[f"bilgi_{i}"],
-                        "siklik": st.session_state[f"siklik_{i}"],
-                        "hacim": st.session_state[f"hacim_{i}"],
-                    }
-                    for i in range(1, 6)
-                }
-                st.session_state.suitability_profile = UniversalSuitabilityEngine.evaluate(
-                    user_id="alperen_gulluoglu",
-                    risk_skoru=r_skor,
-                    answers=ans_dict,
-                    participation_only=sadece_katilim_filtre,
-                )
-                st.session_state.step = 3
-                st.rerun()
-
-        if st.button("⬅️ 1. Etaba Geri Dön"):
-            st.session_state.step = 1
-            st.rerun()
-
+    if len(filtered_signals) == 0:
+        st.warning("⚠️ Sol menüde belirlediğiniz filtre kriterlerine uyan varlık bulunamadı. Lütfen sol menüdeki filtreleri gevşetin.")
     else:
-        st.success("✅ Yatırım Uygunluk Testi tamamlandı ve onaylanan tüm varlık sınıfları Karar Motoruna bağlandı!")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Risk Skorunuz", f"{prof.risk_score} / 5")
-        c2.metric("Erişime Açık Seviye Sayısı", f"{len(prof.approved_levels)}")
-        c3.metric("Kısıtlanan Seviye Sayısı", f"{len(prof.restricted_levels)}")
+        signal_rows = []
+        for s in sorted(filtered_signals, key=lambda x: x.composite_score, reverse=True):
+            signal_rows.append({
+                "Kod": s.symbol,
+                "Varlık Adı": s.name,
+                "Risk Seviyesi": f"Seviye {s.risk_level}",
+                "Varlık Sınıfı": s.asset_class,
+                "Karar Sinyali": s.action.value,
+                "Bileşik Skor": s.composite_score,
+                "Teknik Skor": s.technical_score,
+                "Temel/TER": s.fundamental_score,
+                "KAP AI": s.kap_sentiment_score,
+                "Anlık Fiyat": f"{s.current_price:,.2f} {s.currency}",
+                "Önerilen Adet": s.recommended_quantity,
+                "Emir Tutarı (TL)": s.recommended_notional_try,
+                "Stop-Loss": s.stop_loss_price,
+                "Take-Profit": s.take_profit_price,
+                "Karar Gerekçesi": " | ".join(s.rationale[:3]),
+            })
 
-        for gr in prof.group_results:
-            badge = "<span class='aq-badge-ok'>✅ Erişime Açık</span>" if gr.is_suitable else "<span class='aq-badge-lock'>🔒 Kısıtlı</span>"
-            st.markdown(
-                f"<div class='aq-card'><div style='display:flex;justify-content:space-between;align-items:center;'>"
-                f"<b>{gr.group_name}</b> {badge}</div>"
-                f"<div style='font-size:13px;margin-top:6px;color:#B0B6C4;'>Sistem Gerekçesi: <b>{gr.reason_text}</b><br>"
-                f"<b>Bu Seviyedeki Piyasa Araçları:</b> {' • '.join(gr.recommended_products)}</div></div>",
-                unsafe_allow_html=True,
+        st.dataframe(pd.DataFrame(signal_rows), use_container_width=True, hide_index=True)
+
+        col_mail_btn, _ = st.columns([1, 2])
+        with col_mail_btn:
+            if st.button("📧 Filtrelenen Sinyalleri E-Posta Olarak Gönder", use_container_width=True):
+                ok, msg = EmailSignalNotifier.send_email_alert(
+                    recipient_email=alici_eposta,
+                    suitability=prof,
+                    signals=filtered_signals,
+                    sender_email=gonderici_eposta,
+                    smtp_app_password=smtp_sifre or None,
+                )
+                if ok:
+                    st.success(f"✅ {msg}")
+                else:
+                    st.info(f"ℹ️ {msg} (Aşağıda hazır HTML e-posta çıktısını inceleyebilirsiniz.)")
+
+        with st.expander("📨 E-Posta Bildirim Raporu Canlı Önizleme (HTML)"):
+            st.components.v1.html(
+                EmailSignalNotifier.build_html_report(prof, filtered_signals),
+                height=420,
+                scrolling=True,
             )
 
-        st.info(f"💡 **Davranışsal Finans Profiliniz:** {prof.behavioral_profile_text}")
-        if st.button("🔄 Uygunluk Testini Baştan Düzenle"):
-            st.session_state.step = 1
-            st.rerun()
+# ============================================================================
+# MASA 3: ÇOKLU VARLIK TARAYICISI
+# ============================================================================
+with tab_screener:
+    st.subheader("🎯 Çoklu Varlık Tarayıcısı (Multi-Asset Screener)")
+    st.caption("Sol menüdeki sektör, endeks, çarpan ve volatilite filtreleriyle senkronize taranan tüm enstrümanlar:")
 
-with tab_varliklar:
-    st.subheader("🌍 Seviye 1 - 5 Evrensel Çoklu Varlık Veri Merkezi")
-    asset_table = []
-    for sym, snap in universe_snapshots.items():
-        m = QuantitativeIndicators.compute_metrics(snap.ohlcv_history)
-        asset_table.append({
-            "Sembol": sym,
-            "Varlık / Fon Adı": snap.name,
-            "Risk Seviyesi": f"Seviye {snap.risk_level}",
-            "SPK Durumu": "✅ Açık" if snap.risk_level in prof.approved_levels else "🔒 Kısıtlı",
-            "Varlık Sınıfı": snap.asset_class.value,
-            "Katılım Uyumlu": "Evet" if snap.is_participation_compliant else "Konvansiyonel",
-            "Son Fiyat": f"{snap.current_price:,.2f} {snap.currency}",
-            "RSI (14)": snap.rsi_tv if snap.rsi_tv is not None else m["rsi_14"],
-            "1 Aylık Dibe Uzaklık (%)": f"%{m['dist_from_monthly_low_pct']:.2f}",
-            "F/K": snap.pe_ratio if snap.pe_ratio is not None else "-",
-            "ROE (%)": snap.roe_pct if snap.roe_pct is not None else "-",
-            "Fon Gideri (TER %)": snap.expense_ratio_pct if snap.expense_ratio_pct is not None else "-",
-        })
-    st.dataframe(pd.DataFrame(asset_table), use_container_width=True, hide_index=True)
+    if len(filtered_snapshots) == 0:
+        st.warning("⚠️ Sol menüdeki filtrelere uyan varlık bulunamadı. Lütfen sol panelden kriterleri genişletin.")
+    else:
+        asset_table = []
+        for sym, snap in filtered_snapshots.items():
+            m = QuantitativeIndicators.compute_metrics(snap.ohlcv_history)
+            asset_table.append({
+                "Sembol": sym,
+                "Varlık / Fon Adı": snap.name,
+                "Risk Seviyesi": f"Seviye {snap.risk_level}",
+                "SPK Durumu": "✅ Açık" if snap.risk_level in prof.approved_levels else "🔒 Kısıtlı",
+                "Varlık Sınıfı": snap.asset_class.value,
+                "Sektör": snap.sector,
+                "Katılım Uyumlu": "Evet" if snap.is_participation_compliant else "Konvansiyonel",
+                "Son Fiyat": f"{snap.current_price:,.2f} {snap.currency}",
+                "RSI (14)": snap.rsi_tv if snap.rsi_tv is not None else m["rsi_14"],
+                "1 Aylık Dibe Uzaklık (%)": f"%{m['dist_from_monthly_low_pct']:.2f}",
+                "F/K": snap.pe_ratio if snap.pe_ratio is not None else "-",
+                "PD/DD": snap.pb_ratio if snap.pb_ratio is not None else "-",
+                "ROE (%)": snap.roe_pct if snap.roe_pct is not None else "-",
+                "Fon Gideri (TER %)": snap.expense_ratio_pct if snap.expense_ratio_pct is not None else "-",
+            })
+        st.dataframe(pd.DataFrame(asset_table), use_container_width=True, hide_index=True)
 
+# ============================================================================
+# MASA 4: KAP AI İSTİHBARAT MASASI
+# ============================================================================
 with tab_kap:
-    st.subheader("📰 KAP Bildirimlerini Olumlu / Olumsuz Analiz Eden AI Motoru")
+    st.subheader("🧠 KAP Bildirim İstihbarat & Gemini AI Analiz Masası")
     with st.form("yeni_kap_form"):
         st.markdown("**Yeni KAP Bildirimi veya Piyasa Haberi Analiz Et (Gemini AI + Kural Motoru)**")
         c1, c2 = st.columns([1, 3])
@@ -2352,11 +2519,16 @@ with tab_kap:
         })
     st.dataframe(pd.DataFrame(kap_df_rows), use_container_width=True, hide_index=True)
 
-with tab_screener:
-    st.subheader("📈 Tarihsel Veri Analizi (Backtest) & Mum Grafiği / PDF Araştırma Raporu")
+# ============================================================================
+# MASA 5: KANTİTATİF BACKTEST & KURUMSAL PDF RAPORU
+# ============================================================================
+with tab_quant:
+    st.subheader("🔬 Kantitatif Strateji Backtesti & Kurumsal PDF Araştırma Raporu")
     backtester = TimeSeriesBacktester()
+    
+    target_snaps = filtered_snapshots if filtered_snapshots else universe_snapshots
     bt_rows = []
-    for sym, snap in universe_snapshots.items():
+    for sym, snap in target_snaps.items():
         rep = backtester.run_backtest(sym, snap.ohlcv_history, name=snap.name, risk_level=snap.risk_level)
         bt_rows.append({
             "Sembol": rep.symbol,
@@ -2372,9 +2544,9 @@ with tab_screener:
     st.dataframe(pd.DataFrame(bt_rows), use_container_width=True, hide_index=True)
 
     st.markdown("<hr>", unsafe_allow_html=True)
-    secilen_varlik = st.selectbox("Detaylı Mum Grafiği ve PDF Araştırma Raporu İçin Varlık Seçin", list(universe_snapshots.keys()))
+    secilen_varlik = st.selectbox("Detaylı Mum Grafiği ve PDF Araştırma Raporu İçin Varlık Seçin", list(target_snaps.keys()))
     if secilen_varlik:
-        snap_sel = universe_snapshots[secilen_varlik]
+        snap_sel = target_snaps[secilen_varlik]
         hist_df = snap_sel.ohlcv_history
         fig = go.Figure(
             data=[
@@ -2392,8 +2564,8 @@ with tab_screener:
         fig.update_layout(
             title=f"{snap_sel.symbol} — {snap_sel.name} (6 Aylık Fiyat Serisi)",
             template="plotly_dark",
-            paper_bgcolor="#131722",
-            plot_bgcolor="#131722",
+            paper_bgcolor="#0B0E14",
+            plot_bgcolor="#0B0E14",
             xaxis_rangeslider_visible=False,
             height=460,
         )
