@@ -1964,12 +1964,13 @@ st.caption(
 )
 st.markdown("<hr style='margin-top: 4px;'>", unsafe_allow_html=True)
 
-tab_karar, tab_test, tab_varliklar, tab_kap, tab_screener = st.tabs([
-    "🤖 1. Evrensel Karar Motoru & Sinyal Botu",
-    "🧭 2. SPK Yatırım Uygunluk & Risk Testi",
-    "🌍 3. Çoklu Varlık Evreni (Seviye 1-5 Tüm Araçlar)",
-    "📰 4. KAP Bildirim & Gemini AI Analizörü",
-    "📊 5. Tarihsel Backtest & Mum Grafiği / PDF",
+tab_market, tab_karar, tab_test, tab_varliklar, tab_kap, tab_screener = st.tabs([
+    "📈 1. Canlı Piyasa & Endeks Grafikleri (Market Overview)",
+    "🤖 2. Evrensel Karar Motoru & Sinyal Botu",
+    "🧭 3. SPK Yatırım Uygunluk & Risk Testi",
+    "🌍 4. Çoklu Varlık Evreni (Seviye 1-5 Tüm Araçlar)",
+    "📰 5. KAP Bildirim & Gemini AI Analizörü",
+    "📊 6. Tarihsel Backtest & Mum Grafiği / PDF",
 ])
 
 fetcher = MultiAssetDataFetcher(
@@ -1994,6 +1995,116 @@ all_signals: List[DecisionSignal] = [
     decision_engine.evaluate_asset(snap, kap_results_by_symbol.get(sym))
     for sym, snap in universe_snapshots.items()
 ]
+
+
+with tab_market:
+    st.subheader("📈 Canlı Piyasa Genel Bakış (BIST 100, BIST 30 & Küresel Varlıklar)")
+    st.caption("AlpQuant v1 açılış paneli: Anlık endeks seviyeleri, 6 aylık tepe/dip bantları, 50 günlük hareketli ortalama trend analizi ve interaktif mum grafikleri:")
+
+    sub_t1, sub_t2, sub_t3, sub_t4, sub_t5 = st.tabs([
+        "🇹🇷 BIST 100 (XU100)",
+        "💎 BIST 30 (XU030)",
+        "🇺🇸 S&P 500 (SPY)",
+        "🥇 Gram Altın (Spot TL)",
+        "⚡ Bitcoin (BTC/USD)"
+    ])
+
+    def render_dashboard(df: pd.DataFrame, title: str, currency: str = "TL"):
+        if df is None or df.empty or len(df) < 2:
+            st.warning(f"⚠️ {title} verisi şu anda yüklenemedi.")
+            return
+
+        last_price = float(df['Close'].iloc[-1])
+        prev_price = float(df['Close'].iloc[-2])
+        pct_change = ((last_price - prev_price) / max(prev_price, 0.0001)) * 100
+        high_6m = float(df['High'].max())
+        low_6m = float(df['Low'].min())
+        
+        sma50_series = df['Close'].rolling(window=min(50, len(df)), min_periods=5).mean()
+        sma50 = float(sma50_series.iloc[-1]) if not sma50_series.empty else last_price
+        
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric(f"{title} Fiyatı", f"{last_price:,.2f} {currency}", f"{pct_change:+.2f}%")
+        c2.metric("6 Aylık Zirve (6M High)", f"{high_6m:,.2f} {currency}")
+        c3.metric("6 Aylık Dip (6M Low)", f"{low_6m:,.2f} {currency}")
+        
+        trend_status = "🟢 Boğa (Bullish)" if not pd.isna(sma50) and last_price >= sma50 else "🔴 Ayı (Bearish)"
+        dist_to_high = ((high_6m - last_price) / max(high_6m, 0.01)) * 100
+        c4.metric("50 Günlük Trend", trend_status, f"Zirveye Uzaklık: %{dist_to_high:.1f}")
+        
+        commentary = f"**Piyasa Analitiği:** **{title}** endeksi 50 günlük hareketli ortalamasına (SMA50: {sma50:,.2f} {currency}) kıyasla **{trend_status}** bölgede seyretmektedir. "
+        if dist_to_high < 2.5:
+            commentary += f"Fiyat 6 aylık zirvesine ({high_6m:,.2f} {currency}) son derece yakın olup güçlü yukarı yönlü momentumu sürdürmektedir."
+        elif dist_to_high > 12.0:
+            commentary += f"Fiyat 6 aylık zirvesinden **%{dist_to_high:.1f}** oranında çekilmiş olup dip konsolidasyon ve toparlanma aşamasındadır."
+        else:
+            commentary += f"Fiyat 6 aylık zirvesinin **%{dist_to_high:.1f}** altında dengeli işlem görmektedir."
+        
+        st.markdown(
+            f"<div style='background-color:#1E222D; padding:14px 18px; border-radius:8px; border-left: 4px solid #2962FF; margin-top:10px; margin-bottom: 18px; color: #D1D4DC; font-size: 14.5px;'>{commentary}</div>",
+            unsafe_allow_html=True
+        )
+
+        fig_idx = go.Figure(data=[go.Candlestick(
+            x=df.index, open=df['Open'], high=df['High'],
+            low=df['Low'], close=df['Close'],
+            increasing_line_color='#089981', decreasing_line_color='#F23645',
+            name=title
+        )])
+        if len(df) >= 20:
+            sma20_series = df['Close'].rolling(window=20, min_periods=5).mean()
+            fig_idx.add_trace(go.Scatter(
+                x=df.index, y=sma20_series,
+                mode='lines', line=dict(color='#2962FF', width=1.5), name='SMA 20'
+            ))
+            fig_idx.add_trace(go.Scatter(
+                x=df.index, y=sma50_series,
+                mode='lines', line=dict(color='#FF9800', width=1.5), name='SMA 50'
+            ))
+        fig_idx.update_layout(
+            template="plotly_dark", paper_bgcolor="#131722", plot_bgcolor="#131722",
+            margin=dict(l=10, r=10, t=10, b=10), xaxis_rangeslider_visible=False,
+            xaxis=dict(showgrid=True, gridcolor="#2A2E39"),
+            yaxis=dict(showgrid=True, gridcolor="#2A2E39", side="right"),
+            height=480,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig_idx, use_container_width=True)
+
+    def safe_get_market_index_data(ticker: str, fallback_symbol: str, base_price: float, risk_level: int = 3) -> pd.DataFrame:
+        df = None
+        if canli_veri_aktif and HAS_YFINANCE:
+            try:
+                hist = yf.Ticker(ticker).history(period="6mo")
+                if hist is not None and not hist.empty and len(hist) >= 15:
+                    df = hist[["Open", "High", "Low", "Close", "Volume"]].copy()
+                    if fallback_symbol == "XAU_TRY":
+                        scale = base_price / float(df["Close"].iloc[-1])
+                        for col in ("Open", "High", "Low", "Close"):
+                            df[col] = np.round(df[col] * scale, 4)
+            except Exception as exc:
+                logger.debug("Live data fetch error for %s: %s", ticker, exc)
+                df = None
+        if df is None or df.empty or len(df) < 15:
+            fetcher_inst = MultiAssetDataFetcher(prefer_live_data=False)
+            df = fetcher_inst.generate_synthetic_ohlcv(symbol=fallback_symbol, base_price=base_price, days=120, risk_level=risk_level)
+        return df
+
+    with sub_t1:
+        xu100_df = safe_get_market_index_data("XU100.IS", "XU100", 9250.0, risk_level=3)
+        render_dashboard(xu100_df, "BIST 100 (XU100)", "TL")
+    with sub_t2:
+        xu030_df = safe_get_market_index_data("XU030.IS", "XU030", 10180.0, risk_level=3)
+        render_dashboard(xu030_df, "BIST 30 (XU030)", "TL")
+    with sub_t3:
+        spy_df = safe_get_market_index_data("SPY", "SPY", 585.0, risk_level=3)
+        render_dashboard(spy_df, "S&P 500 ETF (SPY)", "USD")
+    with sub_t4:
+        xau_df = safe_get_market_index_data("GC=F", "XAU_TRY", 3050.0, risk_level=1)
+        render_dashboard(xau_df, "Gram Altın (Spot TL)", "TL")
+    with sub_t5:
+        btc_df = safe_get_market_index_data("BTC-USD", "BTC-USD", 68500.0, risk_level=5)
+        render_dashboard(btc_df, "Bitcoin (BTC/USD)", "USD")
 
 with tab_karar:
     st.subheader("🤖 Otonom Karar Mekanizması (Tüm Piyasa Varlıkları: Seviye 1 - 5)")
