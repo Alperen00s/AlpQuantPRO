@@ -2564,7 +2564,7 @@ with tab_quant:
         fig.update_layout(
             title=f"{snap_sel.symbol} — {snap_sel.name} (6 Aylık Fiyat Serisi)",
             template="plotly_white",
-            paper_bgcolor="#0B0E14",
+            paper_bgcolor="#0B0E10",
             plot_bgcolor="#0B0E14",
             xaxis_rangeslider_visible=False,
             height=460,
