@@ -1139,6 +1139,11 @@ class MultiAssetDataFetcher:
         return snapshots
 
 
+def normalize_turkish_lower(text: str) -> str:
+    """Türkçe büyük İ/I harflerini Python unicode kombinasyon hatası olmadan küçültür."""
+    return str(text).replace("İ", "i").replace("I", "ı").lower()
+
+
 @dataclass
 class KAPDisclosure:
     disclosure_id: str
