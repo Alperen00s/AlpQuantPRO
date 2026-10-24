@@ -1632,52 +1632,77 @@ class EmailSignalNotifier:
         signals: List[DecisionSignal],
     ) -> str:
         rows_html = ""
-        for s in signals:
-            badge_color = (
-                "#006554"
-                if s.action in (SignalAction.STRONG_BUY, SignalAction.BUY)
-                else ("#DC3545" if "VETO" in s.action.value or "SAT" in s.action.value else "#6C757D")
-            )
+        for idx, s in enumerate(signals):
+            row_bg = "#121722" if idx % 2 == 0 else "#161D2B"
+            if s.action in (SignalAction.STRONG_BUY, SignalAction.BUY):
+                badge_style = "background:rgba(0,192,135,0.22);color:#00E6B8;border:1px solid #00C087;"
+            elif "VETO" in s.action.value or "SAT" in s.action.value or "KISITLI" in s.action.value:
+                badge_style = "background:rgba(242,54,69,0.22);color:#FF6B78;border:1px solid #F23645;"
+            else:
+                badge_style = "background:rgba(148,163,184,0.18);color:#E2E8F0;border:1px solid #64748B;"
+
+            rationale_html = "<br>".join(f"• {r}" for r in s.rationale[:3])
             rows_html += f"""
-            <tr>
-                <td style="padding:8px;border:1px solid #ddd;"><b>{s.symbol}</b><br><small>{s.name}</small></td>
-                <td style="padding:8px;border:1px solid #ddd;text-align:center;">Seviye {s.risk_level}</td>
-                <td style="padding:8px;border:1px solid #ddd;text-align:center;">
-                    <span style="background:{badge_color};color:#fff;padding:3px 8px;border-radius:4px;font-weight:bold;">
+            <tr style="background-color:{row_bg};">
+                <td style="padding:10px 12px;border:1px solid #232C40;color:#FFFFFF;">
+                    <b style="color:#FFFFFF;font-size:13.5px;">{s.symbol}</b><br>
+                    <small style="color:#94A3B8;font-size:11.5px;">{s.name}</small>
+                </td>
+                <td style="padding:10px 12px;border:1px solid #232C40;text-align:center;color:#CBD5E1;font-weight:600;">
+                    Seviye {s.risk_level}
+                </td>
+                <td style="padding:10px 12px;border:1px solid #232C40;text-align:center;">
+                    <span style="{badge_style}padding:4px 10px;border-radius:6px;font-weight:700;font-size:12px;display:inline-block;">
                         {s.action.value}
                     </span>
                 </td>
-                <td style="padding:8px;border:1px solid #ddd;text-align:right;"><b>{s.composite_score:.2f}</b></td>
-                <td style="padding:8px;border:1px solid #ddd;text-align:right;">{s.current_price:,.2f} {s.currency}</td>
-                <td style="padding:8px;border:1px solid #ddd;text-align:right;">{s.recommended_quantity} Adet<br><small>({s.recommended_notional_try:,.0f} TL)</small></td>
-                <td style="padding:8px;border:1px solid #ddd;text-align:right;">SL: {s.stop_loss_price:,.2f}<br>TP: {s.take_profit_price:,.2f}</td>
-                <td style="padding:8px;border:1px solid #ddd;font-size:12px;">{"<br>• ".join([""] + s.rationale[:3])[4:]}</td>
+                <td style="padding:10px 12px;border:1px solid #232C40;text-align:right;color:#60A5FA;font-weight:700;font-size:14px;">
+                    {s.composite_score:.2f}
+                </td>
+                <td style="padding:10px 12px;border:1px solid #232C40;text-align:right;color:#FFFFFF;font-weight:600;">
+                    {s.current_price:,.2f} {s.currency}
+                </td>
+                <td style="padding:10px 12px;border:1px solid #232C40;text-align:right;color:#E2E8F0;font-weight:600;">
+                    {s.recommended_quantity} Adet<br>
+                    <small style="color:#94A3B8;font-weight:400;">({s.recommended_notional_try:,.0f} TL)</small>
+                </td>
+                <td style="padding:10px 12px;border:1px solid #232C40;text-align:right;font-size:12px;font-weight:600;">
+                    <span style="color:#FF6B78;">SL: {s.stop_loss_price:,.2f}</span><br>
+                    <span style="color:#00E6B8;">TP: {s.take_profit_price:,.2f}</span>
+                </td>
+                <td style="padding:10px 12px;border:1px solid #232C40;font-size:12px;color:#CBD5E1;line-height:1.45;">
+                    {rationale_html}
+                </td>
             </tr>
             """
 
         return f"""
+        <!DOCTYPE html>
         <html>
-        <body style="font-family:Segoe UI,Arial,sans-serif;color:#222;">
-            <div style="border-top:5px solid #2962FF;padding:16px;background:#F4F7F6;">
-                <h2 style="color:#131722;margin:0;">AlpQuant v3.5 — Evrensel Çoklu Varlık Karar Motoru Sinyal Raporu</h2>
-                <p style="margin:6px 0 0 0;font-size:14px;">
-                    <b>Yatırımcı SPK Risk Skoru:</b> {suitability.risk_score}/5 |
-                    <b>Onaylı Seviyeler:</b> {suitability.approved_levels} |
-                    <b>Evren Modu:</b> {"Sadece Katılım" if suitability.participation_only else "Tüm Piyasa (Konvansiyonel + Katılım)"} |
-                    <b>Tarih:</b> {dt.datetime.now().strftime('%Y-%m-%d %H:%M')}
+        <head><meta charset="utf-8"></head>
+        <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background-color:#0B0E14;color:#E2E8F0;margin:0;padding:14px;">
+            <div style="background:linear-gradient(135deg,#141B2D 0%,#0F1420 100%);border:1px solid #263147;border-left:5px solid #2962FF;border-radius:8px;padding:16px 20px;">
+                <h2 style="color:#FFFFFF;margin:0;font-size:18px;font-weight:700;">
+                    AlpQuant v3.5 — Evrensel Çoklu Varlık Karar Motoru Sinyal Raporu
+                </h2>
+                <p style="margin:8px 0 0 0;font-size:13.5px;color:#CBD5E1;">
+                    <b style="color:#60A5FA;">Yatırımcı SPK Risk Skoru:</b> {suitability.risk_score}/5 &nbsp;|&nbsp;
+                    <b style="color:#60A5FA;">Onaylı Seviyeler:</b> {suitability.approved_levels} &nbsp;|&nbsp;
+                    <b style="color:#60A5FA;">Evren Modu:</b> {"Sadece Katılım" if suitability.participation_only else "Tüm Piyasa (Konvansiyonel + Katılım)"} &nbsp;|&nbsp;
+                    <b style="color:#60A5FA;">Tarih:</b> {dt.datetime.now().strftime('%Y-%m-%d %H:%M')}
                 </p>
             </div>
-            <table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:13px;">
+            <table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:13px;background-color:#121722;color:#E2E8F0;border:1px solid #263147;border-radius:8px;overflow:hidden;">
                 <thead>
-                    <tr style="background:#131722;color:#fff;">
-                        <th style="padding:8px;border:1px solid #ddd;">Varlık</th>
-                        <th style="padding:8px;border:1px solid #ddd;">SPK Risk</th>
-                        <th style="padding:8px;border:1px solid #ddd;">Sinyal</th>
-                        <th style="padding:8px;border:1px solid #ddd;">Skor</th>
-                        <th style="padding:8px;border:1px solid #ddd;">Fiyat</th>
-                        <th style="padding:8px;border:1px solid #ddd;">Önerilen Emir</th>
-                        <th style="padding:8px;border:1px solid #ddd;">SL / TP</th>
-                        <th style="padding:8px;border:1px solid #ddd;">Analitik Gerekçe</th>
+                    <tr style="background-color:#192132;color:#94A3B8;text-transform:uppercase;font-size:11.5px;letter-spacing:0.5px;">
+                        <th style="padding:10px 12px;border:1px solid #263147;text-align:left;color:#94A3B8;">Varlık</th>
+                        <th style="padding:10px 12px;border:1px solid #263147;text-align:center;color:#94A3B8;">SPK Risk</th>
+                        <th style="padding:10px 12px;border:1px solid #263147;text-align:center;color:#94A3B8;">Sinyal</th>
+                        <th style="padding:10px 12px;border:1px solid #263147;text-align:right;color:#94A3B8;">Skor</th>
+                        <th style="padding:10px 12px;border:1px solid #263147;text-align:right;color:#94A3B8;">Fiyat</th>
+                        <th style="padding:10px 12px;border:1px solid #263147;text-align:right;color:#94A3B8;">Önerilen Emir</th>
+                        <th style="padding:10px 12px;border:1px solid #263147;text-align:right;color:#94A3B8;">SL / TP</th>
+                        <th style="padding:10px 12px;border:1px solid #263147;text-align:left;color:#94A3B8;">Analitik Gerekçe</th>
                     </tr>
                 </thead>
                 <tbody>{rows_html}</tbody>
@@ -1849,6 +1874,32 @@ st.markdown(
         margin-bottom: 6px;
     }
     hr { border-color: #1E2638 !important; margin-top: 0.8rem; margin-bottom: 0.8rem; }
+
+    /* Expander & Input Dark Contrast Enforcement */
+    [data-testid="stExpander"] {
+        background-color: #121722 !important;
+        border: 1px solid #1E2638 !important;
+        border-radius: 8px !important;
+    }
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] summary span,
+    [data-testid="stExpander"] summary p {
+        color: #E2E8F0 !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stExpanderDetails"] {
+        background-color: #0E131D !important;
+        color: #E2E8F0 !important;
+    }
+    input, textarea, [data-baseweb="input"], [data-baseweb="base-input"], [data-baseweb="select"] > div {
+        background-color: #141A29 !important;
+        color: #FFFFFF !important;
+        border-color: #263147 !important;
+    }
+    label, [data-testid="stWidgetLabel"] p {
+        color: #CBD5E1 !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
