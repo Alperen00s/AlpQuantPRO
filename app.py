@@ -50,7 +50,7 @@ except Exception:
 # 1. PAGE CONFIG & TURKISH NORMALIZATION HELPERS
 # =============================================================================
 st.set_page_config(
-    page_title="AlpQuant Pro v4.2 | Kurumsal Kantitatif Terminal",
+    page_title="AlpQuant Pro v5.1 | Kurumsal Kantitatif Terminal",
     page_icon="◈",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -2331,32 +2331,326 @@ def generate_pdf_bytes(signals: List[SignalResult], profile: SuitabilityProfile)
 
 
 
+
 # =============================================================================
-# 8. DESIGN SYSTEM LOADER (v5.0 CALM, BREATHABLE, SIDEBAR-FREE)
+# 8. SELF-CONTAINED DESIGN SYSTEM (v5.1 — FULL CSS EMBEDDED IN APP.PY)
 # =============================================================================
-INLINE_FALLBACK_CSS = """
+EMBEDDED_CSS = """
 <style>
-[data-testid="stSidebar"], [data-testid="collapsedControl"], section[data-testid="stSidebar"], #MainMenu, footer {
-    display: none !important; width: 0 !important; visibility: hidden !important;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+    --bg-canvas: #0B0E14;
+    --bg-surface: #111622;
+    --bg-surface-2: #161D2E;
+    --bg-hover: #1C253A;
+    --border-subtle: rgba(148, 163, 184, 0.14);
+    --border-strong: rgba(148, 163, 184, 0.26);
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+    --accent-blue: #3B82F6;
+    --accent-blue-soft: rgba(59, 130, 246, 0.14);
+    --accent-green: #10B981;
+    --accent-green-soft: rgba(16, 185, 129, 0.14);
+    --accent-red: #EF4444;
+    --accent-red-soft: rgba(239, 68, 68, 0.14);
+    --accent-amber: #F59E0B;
+    --accent-amber-soft: rgba(245, 158, 11, 0.14);
 }
+
+/* Hide default Streamlit sidebar & chrome completely */
+[data-testid="stSidebar"],
+[data-testid="collapsedControl"],
+section[data-testid="stSidebar"],
+button[kind="headerNoPadding"],
+#MainMenu,
+footer {
+    display: none !important;
+    width: 0 !important;
+    visibility: hidden !important;
+}
+
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 1.4rem !important;
+}
+
 html, body, [data-testid="stAppViewContainer"], .main {
-    background-color: #0B0E14 !important; color: #F1F5F9 !important;
+    background-color: var(--bg-canvas) !important;
+    color: var(--text-primary) !important;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    -webkit-font-smoothing: antialiased;
 }
-.block-container { max-width: 1400px !important; margin: 0 auto !important; padding: 1.25rem 2.25rem 3.5rem 2.25rem !important; }
+
+.block-container {
+    max-width: 1400px !important;
+    margin: 0 auto !important;
+    padding: 1.2rem 2.1rem 3.5rem 2.1rem !important;
+}
+
+/* Inputs, Selects, Buttons */
+div[data-baseweb="input"] > div,
+div[data-baseweb="select"] > div,
+div[data-baseweb="base-input"] {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 9px !important;
+    color: var(--text-primary) !important;
+}
+
+div[data-baseweb="input"] > div:hover,
+div[data-baseweb="select"] > div:hover {
+    border-color: var(--border-strong) !important;
+    background-color: var(--bg-surface-2) !important;
+}
+
+button[data-testid="stPopoverButton"],
+.stButton > button,
+.stDownloadButton > button {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 9px !important;
+    color: var(--text-primary) !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+    padding: 0.44rem 0.9rem !important;
+    transition: all 0.15s ease !important;
+}
+
+button[data-testid="stPopoverButton"]:hover,
+.stButton > button:hover,
+.stDownloadButton > button:hover {
+    background-color: var(--bg-hover) !important;
+    border-color: var(--border-strong) !important;
+}
+
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
+    border: 1px solid rgba(96, 165, 250, 0.35) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+}
+
+/* Sleek Segmented Top Navigation (Hides ugly red radio dots) */
+div[data-testid="stRadio"] > div[role="radiogroup"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 11px !important;
+    padding: 5px !important;
+}
+
+div[data-testid="stRadio"] > div[role="radiogroup"] > label {
+    background: transparent !important;
+    border-radius: 8px !important;
+    padding: 7px 15px !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+    border: 1px solid transparent !important;
+    transition: all 0.15s ease !important;
+}
+
+div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
+    background: rgba(148, 163, 184, 0.08) !important;
+}
+
+div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-checked="true"],
+div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
+    background: #2563EB !important;
+    border-color: rgba(96, 165, 250, 0.40) !important;
+}
+
+div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {
+    display: none !important;
+}
+
+div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: #94A3B8 !important;
+    margin: 0 !important;
+}
+
+div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) p {
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+}
+
+/* Header */
+.aq-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 2px 14px 2px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.aq-brand-wrap { display: flex; align-items: center; gap: 12px; }
+.aq-mark {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+    display: flex; align-items: center; justify-content: center;
+    color: #FFFFFF; font-weight: 700; font-size: 15px;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+}
+.aq-brand-name { font-size: 17px; font-weight: 700; color: #F8FAFC; letter-spacing: -0.02em; line-height: 1.1; }
+.aq-brand-sub { font-size: 12px; color: #64748B; margin-top: 2px; }
+
+.aq-status-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aq-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--bg-surface); border: 1px solid var(--border-subtle);
+    color: #CBD5E1; font-size: 12px; font-weight: 500;
+    padding: 4px 11px; border-radius: 999px;
+}
+.aq-chip-mono { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; }
+.aq-chip-live { background: rgba(16,185,129,0.14); border-color: rgba(16,185,129,0.32); color: #6EE7B7; }
+.aq-chip-blue { background: rgba(59,130,246,0.14); border-color: rgba(59,130,246,0.34); color: #93C5FD; }
+
+/* Market Index Ticker Strip */
+.aq-index-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+    margin: 6px 0 18px 0;
+}
+.aq-index-card {
+    background: #111622;
+    border: 1px solid rgba(148, 163, 184, 0.13);
+    border-radius: 11px;
+    padding: 11px 13px;
+    transition: border-color 0.15s ease;
+}
+.aq-index-card:hover { border-color: rgba(148, 163, 184, 0.28); }
+.aq-index-name { font-size: 11px; color: #94A3B8; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+.aq-index-val { font-size: 16px; font-weight: 700; color: #F8FAFC; font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
+.aq-index-chg { font-size: 11.5px; font-weight: 600; font-family: 'JetBrains Mono', monospace; margin-top: 3px; }
+
+/* Active Context Strip */
+.aq-context-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(17, 22, 34, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.13);
+    border-radius: 10px;
+    padding: 9px 15px;
+    margin: 8px 0 16px 0;
+    font-size: 12.5px;
+    color: #94A3B8;
+}
+.aq-context-bar b { color: #F1F5F9; font-weight: 600; }
+
+/* 4-Column Breathable KPI Cards */
+.aq-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+.aq-metric-card {
+    background: #111622;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 12px;
+    padding: 15px 18px;
+}
+.aq-metric-label { font-size: 11.5px; color: #94A3B8; font-weight: 500; letter-spacing: 0.02em; }
+.aq-metric-val { font-size: 24px; font-weight: 700; color: #F8FAFC; margin-top: 6px; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; }
+.aq-metric-sub { font-size: 12px; color: #64748B; margin-top: 4px; }
+
+/* Elevated Content & Watchlist Cards */
+.aq-card {
+    background: #111622;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+}
+
+.aq-watch-card {
+    background: #111622;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 12px;
+    padding: 13px 15px;
+    margin-bottom: 8px;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.aq-watch-card:hover { border-color: rgba(148, 163, 184, 0.28); background: #151C2C; }
+.aq-watch-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.aq-sym { font-size: 14.5px; font-weight: 700; color: #F8FAFC; letter-spacing: -0.01em; }
+.aq-name { font-size: 12px; color: #94A3B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+.aq-price { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; color: #F8FAFC; }
+.aq-chg-pos { color: #10B981; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+.aq-chg-neg { color: #EF4444; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+
+/* Spotlight / Haftanın Parlayanları Card */
+.aq-shine-card {
+    background: linear-gradient(180deg, #131928 0%, #101521 100%);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 13px;
+    padding: 15px 16px;
+    margin-bottom: 8px;
+}
+.aq-shine-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.aq-shine-mom {
+    display: inline-block;
+    background: rgba(16, 185, 129, 0.14);
+    color: #34D399;
+    border: 1px solid rgba(16, 185, 129, 0.28);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+/* Status Pills */
+.aq-pill { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.01em; }
+.aq-pill-buy { background: rgba(16,185,129,0.14); color: #34D399; border: 1px solid rgba(16,185,129,0.30); }
+.aq-pill-hold { background: rgba(148,163,184,0.12); color: #CBD5E1; border: 1px solid rgba(148,163,184,0.22); }
+.aq-pill-sell { background: rgba(239,68,68,0.14); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.30); }
+.aq-pill-warn { background: rgba(245,158,11,0.14); color: #FCD34D; border: 1px solid rgba(245,158,11,0.30); }
+
+.aq-section-title {
+    font-size: 15px; font-weight: 600; color: #F1F5F9;
+    margin: 6px 0 12px 0; letter-spacing: -0.01em;
+}
+.aq-section-sub { font-size: 12.5px; color: #64748B; font-weight: 400; margin-left: 6px; }
+
+/* Editorial News Card */
+.aq-news {
+    background: #111622;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+}
+.aq-news-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 11.5px; color: #94A3B8; }
+.aq-news-title { font-size: 14.5px; font-weight: 600; color: #F8FAFC; line-height: 1.45; margin-bottom: 10px; }
+.aq-news-ai { background: #161D2E; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #CBD5E1; line-height: 1.55; }
+
+[data-testid="stDataFrame"] {
+    border: 1px solid rgba(148, 163, 184, 0.14) !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+
+@media (max-width: 1024px) {
+    .aq-index-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .aq-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 </style>
 """
 
 
 def inject_terminal_css() -> None:
-    css_path = Path(__file__).resolve().parent / "style.css"
-    if css_path.exists():
-        try:
-            st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
-            return
-        except Exception:
-            pass
-    st.markdown(INLINE_FALLBACK_CSS, unsafe_allow_html=True)
+    """Always inject full embedded CSS so styling NEVER degrades even without external style.css."""
+    st.markdown(EMBEDDED_CSS, unsafe_allow_html=True)
 
 
 def action_pill_class(action: str) -> str:
@@ -2372,8 +2666,7 @@ def action_pill_class(action: str) -> str:
 # =============================================================================
 # 9. CLEAN, BREATHABLE INTERACTIVE CHARTS
 # =============================================================================
-def build_hero_area_chart(snap: AssetSnapshot, height: int = 330) -> go.Figure:
-    """Clean Robinhood/Koyfin-style area + SMA20 spotlight chart for Overview."""
+def build_hero_area_chart(snap: AssetSnapshot, height: int = 335) -> go.Figure:
     df = snap.df.tail(65)
     is_pos = snap.change_pct >= 0
     line_col = "#10B981" if is_pos else "#EF4444"
@@ -2382,89 +2675,55 @@ def build_hero_area_chart(snap: AssetSnapshot, height: int = 330) -> go.Figure:
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=df.index,
-            y=df["Close"],
-            mode="lines",
+            x=df.index, y=df["Close"], mode="lines",
             line=dict(color=line_col, width=2.2),
-            fill="tozeroy",
-            fillcolor=fill_col,
-            name="Kapanış",
+            fill="tozeroy", fillcolor=fill_col, name="Kapanış",
             hovertemplate="%{x|%d %b %Y}<br><b>%{y:,.2f}</b><extra></extra>",
         )
     )
     sma20 = df["Close"].rolling(20, min_periods=5).mean()
     fig.add_trace(
         go.Scatter(
-            x=df.index,
-            y=sma20,
-            mode="lines",
-            line=dict(color="#60A5FA", width=1.4, dash="dot"),
-            name="SMA 20",
+            x=df.index, y=sma20, mode="lines",
+            line=dict(color="#60A5FA", width=1.4, dash="dot"), name="SMA 20",
             hovertemplate="SMA20: %{y:,.2f}<extra></extra>",
         )
     )
     fig.update_layout(
         height=height,
-        margin=dict(l=8, r=12, t=12, b=8),
+        margin=dict(l=8, r=12, t=10, b=8),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11, color="#94A3B8")),
         xaxis=dict(showgrid=False, zeroline=False, tickfont=dict(size=11, color="#64748B")),
-        yaxis=dict(
-            gridcolor="rgba(148, 163, 184, 0.08)",
-            zeroline=False,
-            side="right",
-            tickfont=dict(size=11, color="#94A3B8"),
-        ),
+        yaxis=dict(gridcolor="rgba(148,163,184,0.08)", zeroline=False, side="right", tickfont=dict(size=11, color="#94A3B8")),
     )
     return fig
 
 
 def build_detailed_candlestick(snap: AssetSnapshot, df_override: Optional[pd.DataFrame] = None) -> go.Figure:
-    """Clean institutional candlestick + SMA20/SMA50 + Volume chart for Deep-Dive."""
     df = (df_override if df_override is not None else snap.df).tail(95)
-    fig = make_subplots(
-        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.76, 0.24]
-    )
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.76, 0.24])
     fig.add_trace(
         go.Candlestick(
-            x=df.index,
-            open=df["Open"],
-            high=df["High"],
-            low=df["Low"],
-            close=df["Close"],
-            increasing_line_color="#10B981",
-            decreasing_line_color="#EF4444",
-            increasing_fillcolor="rgba(16,185,129,0.75)",
-            decreasing_fillcolor="rgba(239,68,68,0.75)",
+            x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"],
+            increasing_line_color="#10B981", decreasing_line_color="#EF4444",
+            increasing_fillcolor="rgba(16,185,129,0.75)", decreasing_fillcolor="rgba(239,68,68,0.75)",
             name=snap.symbol,
         ),
         row=1, col=1,
     )
     fig.add_trace(
-        go.Scatter(
-            x=df.index,
-            y=df["Close"].rolling(20, min_periods=5).mean(),
-            line=dict(color="#60A5FA", width=1.6),
-            name="SMA 20",
-        ),
+        go.Scatter(x=df.index, y=df["Close"].rolling(20, min_periods=5).mean(), line=dict(color="#60A5FA", width=1.6), name="SMA 20"),
         row=1, col=1,
     )
     fig.add_trace(
-        go.Scatter(
-            x=df.index,
-            y=df["Close"].rolling(50, min_periods=10).mean(),
-            line=dict(color="#F59E0B", width=1.6),
-            name="SMA 50",
-        ),
+        go.Scatter(x=df.index, y=df["Close"].rolling(50, min_periods=10).mean(), line=dict(color="#F59E0B", width=1.6), name="SMA 50"),
         row=1, col=1,
     )
     bar_colors = np.where(df["Close"] >= df["Open"], "rgba(16,185,129,0.45)", "rgba(239,68,68,0.45)")
-    fig.add_trace(
-        go.Bar(x=df.index, y=df["Volume"], marker_color=bar_colors, name="Hacim"),
-        row=2, col=1,
-    )
+    fig.add_trace(go.Bar(x=df.index, y=df["Volume"], marker_color=bar_colors, name="Hacim"), row=2, col=1)
     fig.update_layout(
         height=440,
         margin=dict(l=8, r=14, t=18, b=8),
@@ -2480,24 +2739,19 @@ def build_detailed_candlestick(snap: AssetSnapshot, df_override: Optional[pd.Dat
     return fig
 
 
-def build_backtest_chart(bt_res: Dict[str, Any], height: int = 290) -> go.Figure:
+def build_backtest_chart(bt_res: Dict[str, Any], height: int = 285) -> go.Figure:
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=bt_res["equity"].index,
-            y=bt_res["equity"].values,
-            name="AlpQuant Strateji",
-            line=dict(color="#3B82F6", width=2.2),
-            fill="tozeroy",
-            fillcolor="rgba(59, 130, 246, 0.10)",
+            x=bt_res["equity"].index, y=bt_res["equity"].values,
+            name="AlpQuant Strateji", line=dict(color="#3B82F6", width=2.2),
+            fill="tozeroy", fillcolor="rgba(59, 130, 246, 0.10)",
         )
     )
     fig.add_trace(
         go.Scatter(
-            x=bt_res["bh_equity"].index,
-            y=bt_res["bh_equity"].values,
-            name="Al & Tut",
-            line=dict(color="#64748B", width=1.5, dash="dot"),
+            x=bt_res["bh_equity"].index, y=bt_res["bh_equity"].values,
+            name="Al & Tut", line=dict(color="#64748B", width=1.5, dash="dot"),
         )
     )
     fig.update_layout(
@@ -2514,7 +2768,7 @@ def build_backtest_chart(bt_res: Dict[str, Any], height: int = 290) -> go.Figure
 
 
 # =============================================================================
-# 10. SESSION STATE & NAVIGATION HELPERS
+# 10. SESSION STATE, MARKET INDICES & NAVIGATION HELPERS
 # =============================================================================
 NAV_PAGES = [
     "Genel Bakış",
@@ -2524,11 +2778,20 @@ NAV_PAGES = [
     "Rapor & Backtest",
 ]
 
+SCREENER_PRESETS = [
+    "Tüm Eşleşenler",
+    "Güçlü Al (Skor 75+)",
+    "Dip Dönüş (RSI < 40)",
+    "Hacim Patlaması (Z > 1.5)",
+    "Değer Fırsatı (F/K < 12)",
+]
+
 
 def init_session_state() -> None:
     defaults = {
         "active_page": "Genel Bakış",
         "selected_symbol": "THYAO",
+        "screener_preset": "Tüm Eşleşenler",
         "suitability_profile": SuitabilityProfile(),
         "total_capital_tl": 250_000.0,
         "use_live_tv": False,
@@ -2576,6 +2839,7 @@ def reset_all_filters() -> None:
     st.session_state.signal_actions = []
     st.session_state.min_score = 0.0
     st.session_state.hide_spk_blocked = False
+    st.session_state.screener_preset = "Tüm Eşleşenler"
 
 
 def focus_asset(symbol: str, go_to_detail: bool = True) -> None:
@@ -2584,8 +2848,32 @@ def focus_asset(symbol: str, go_to_detail: bool = True) -> None:
         st.session_state.active_page = "Varlık İncele"
 
 
+def compute_market_index_cards(snapshots: Dict[str, AssetSnapshot]) -> List[Dict[str, Any]]:
+    """Computes live/calibrated benchmark index cards for the Overview Index Strip."""
+    bist100_snaps = [s for s in snapshots.values() if "BIST_100" in s.indices]
+    xktum_snaps = [s for s in snapshots.values() if s.asset_class == "BIST_STOCK" and s.is_katilim]
+
+    xu100_chg = float(np.mean([s.change_pct for s in bist100_snaps])) if bist100_snaps else 0.85
+    xktum_chg = float(np.mean([s.change_pct for s in xktum_snaps])) if xktum_snaps else 1.12
+    xu100_val = round(9680.0 * (1.0 + xu100_chg / 100.0), 1)
+    xktum_val = round(10420.0 * (1.0 + xktum_chg / 100.0), 1)
+
+    usd = snapshots.get("USDTRY=X")
+    gold = snapshots.get("XAU_TRY")
+    spy = snapshots.get("SPY")
+    btc = snapshots.get("BTC-USD")
+
+    return [
+        {"label": "BIST 100 (XU100)", "val": f"{xu100_val:,.1f}", "chg": round(xu100_chg, 2), "sub": "Puan"},
+        {"label": "BIST Katılım (XKTUM)", "val": f"{xktum_val:,.1f}", "chg": round(xktum_chg, 2), "sub": "Katılım Endeksi"},
+        {"label": "USD / TRY", "val": f"{usd.last_price:,.2f} ₺" if usd else "34.55 ₺", "chg": usd.change_pct if usd else 0.12, "sub": "Spot Kur"},
+        {"label": "Gram Altın", "val": f"{gold.last_price:,.0f} ₺" if gold else "3,045 ₺", "chg": gold.change_pct if gold else 0.64, "sub": "Spot TL"},
+        {"label": "S&P 500 (SPY)", "val": f"${spy.last_price:,.2f}" if spy else "$598.00", "chg": spy.change_pct if spy else 0.42, "sub": "ABD Gösterge"},
+        {"label": "Bitcoin (BTC)", "val": f"${btc.last_price:,.0f}" if btc else "$94,500", "chg": btc.change_pct if btc else 1.85, "sub": "Spot USD"},
+    ]
+
+
 def render_premium_dataframe(df: pd.DataFrame, height: int = 440, selectable: bool = True) -> Optional[int]:
-    """Renders a sparkline- & progress-bar-powered table with safe Streamlit version fallback."""
     col_cfg = {}
     if hasattr(st, "column_config"):
         cc = st.column_config
@@ -2605,13 +2893,8 @@ def render_premium_dataframe(df: pd.DataFrame, height: int = 440, selectable: bo
     if selectable:
         try:
             ev = st.dataframe(
-                df,
-                use_container_width=True,
-                hide_index=True,
-                height=height,
-                column_config=col_cfg or None,
-                on_select="rerun",
-                selection_mode="single-row",
+                df, use_container_width=True, hide_index=True, height=height,
+                column_config=col_cfg or None, on_select="rerun", selection_mode="single-row",
             )
             sel_rows = getattr(getattr(ev, "selection", None), "rows", None)
             if sel_rows:
@@ -2620,18 +2903,12 @@ def render_premium_dataframe(df: pd.DataFrame, height: int = 440, selectable: bo
         except TypeError:
             pass
 
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        height=height,
-        column_config=col_cfg or None,
-    )
+    st.dataframe(df, use_container_width=True, hide_index=True, height=height, column_config=col_cfg or None)
     return None
 
 
 # =============================================================================
-# 11. MAIN APPLICATION — INTERCONNECTED CONSUMER-READY FINTECH WORKSPACE
+# 11. MAIN APPLICATION — ALPQUANT PRO v5.1
 # =============================================================================
 def main() -> None:
     inject_terminal_css()
@@ -2657,7 +2934,7 @@ def main() -> None:
                 <div class="aq-mark">◈</div>
                 <div>
                     <div class="aq-brand-name">AlpQuant Pro</div>
-                    <div class="aq-brand-sub">Çoklu Varlık Kantitatif Yatırım Platformu</div>
+                    <div class="aq-brand-sub">Çoklu Varlık Kantitatif Yatırım Platformu · v5.1</div>
                 </div>
             </div>
             <div class="aq-status-group">
@@ -2672,7 +2949,7 @@ def main() -> None:
     )
 
     # -------------------------------------------------------------------------
-    # 2. ERGONOMIC NAVIGATION BAR + RIGHT-ALIGNED SETTINGS POPOVER
+    # 2. SLEEK SEGMENTED NAVIGATION + SETTINGS POPOVER
     # -------------------------------------------------------------------------
     nav_col, cfg_col = st.columns([5.2, 1.3], gap="medium")
     with nav_col:
@@ -2711,86 +2988,55 @@ def main() -> None:
                         else:
                             rl, lbl = 5, "Çok Yüksek Risk (Agresif / Profesyonel)"
                         st.session_state.suitability_profile = SuitabilityProfile(
-                            user_id=profile.user_id,
-                            risk_score=rl,
-                            risk_label=lbl,
-                            approved_levels=list(range(1, rl + 1)),
-                            max_single_weight=0.10 + rl * 0.03,
+                            user_id=profile.user_id, risk_score=rl, risk_label=lbl,
+                            approved_levels=list(range(1, rl + 1)), max_single_weight=0.10 + rl * 0.03,
                         )
                         st.success(f"SPK Seviye {rl}/5 olarak kaydedildi.")
                         st.rerun()
 
             with ptab_api:
                 st.session_state.total_capital_tl = st.number_input(
-                    "Portföy Sermayesi (TL)",
-                    min_value=10_000.0,
-                    max_value=500_000_000.0,
-                    value=float(st.session_state.total_capital_tl),
-                    step=25_000.0,
+                    "Portföy Sermayesi (TL)", 10_000.0, 500_000_000.0, float(st.session_state.total_capital_tl), step=25_000.0
                 )
-                st.session_state.use_live_tv = st.checkbox(
-                    "Canlı TradingView BIST/ABD Fiyatları", value=st.session_state.use_live_tv
-                )
-                st.session_state.use_live_rss = st.checkbox(
-                    "Canlı KAP & Finans Haber Akışı", value=st.session_state.use_live_rss
-                )
-                st.session_state.use_live_yf_chart = st.checkbox(
-                    "Grafikte Canlı Yahoo Finance", value=st.session_state.use_live_yf_chart
-                )
-                st.session_state.gemini_api_key = st.text_input(
-                    "Gemini API Key (Opsiyonel)", value=st.session_state.gemini_api_key, type="password"
-                )
-                st.session_state.email_recipient = st.text_input(
-                    "E-Posta Alıcısı", value=st.session_state.email_recipient
-                )
+                st.session_state.use_live_tv = st.checkbox("Canlı TradingView BIST/ABD Fiyatları", value=st.session_state.use_live_tv)
+                st.session_state.use_live_rss = st.checkbox("Canlı KAP & Finans Haber Akışı", value=st.session_state.use_live_rss)
+                st.session_state.use_live_yf_chart = st.checkbox("Grafikte Canlı Yahoo Finance", value=st.session_state.use_live_yf_chart)
+                st.session_state.gemini_api_key = st.text_input("Gemini API Key (Opsiyonel)", value=st.session_state.gemini_api_key, type="password")
+                st.session_state.email_recipient = st.text_input("E-Posta Alıcısı", value=st.session_state.email_recipient)
                 ec1, ec2 = st.columns(2)
                 st.session_state.smtp_user = ec1.text_input("SMTP E-Posta", value=st.session_state.smtp_user)
                 st.session_state.smtp_pass = ec2.text_input("Uygulama Şifresi", value=st.session_state.smtp_pass, type="password")
 
     # -------------------------------------------------------------------------
-    # 3. CALM 4-COLUMN SMART FILTER BAR (UNCLUTTERED)
+    # 3. CALM 4-COLUMN SMART FILTER BAR
     # -------------------------------------------------------------------------
     f1, f2, f3, f4 = st.columns([2.4, 1.7, 1.8, 1.1], gap="small")
     with f1:
         st.session_state.search_query = st.text_input(
-            "Ara",
-            value=st.session_state.search_query,
+            "Ara", value=st.session_state.search_query,
             placeholder="Sembol, fon veya şirket ara (ör. THYAO, KTV, NVDA)...",
             label_visibility="collapsed",
         )
 
     market_options = [
-        "Tüm Piyasalar (840+)",
-        "BIST Payları",
-        "TEFAS Fonları",
-        "Küresel ETF & ABD",
-        "Döviz, Altın & Sukuk",
-        "Kripto & 3x ETF",
+        "Tüm Piyasalar (840+)", "BIST Payları", "TEFAS Fonları",
+        "Küresel ETF & ABD", "Döviz, Altın & Sukuk", "Kripto & 3x ETF",
     ]
     with f2:
         st.session_state.market_group = st.selectbox(
-            "Piyasa",
-            options=market_options,
-            index=market_options.index(st.session_state.market_group)
-            if st.session_state.market_group in market_options
-            else 0,
+            "Piyasa", options=market_options,
+            index=market_options.index(st.session_state.market_group) if st.session_state.market_group in market_options else 0,
             label_visibility="collapsed",
         )
 
     katilim_options = [
-        "Tümü (Konv. + Katılım)",
-        "Sadece Katılım Uyumlu",
-        "BIST Katılım (XKTUM)",
-        "TEFAS Katılım Fonları (53)",
-        "İslami ETF & Sukuk",
+        "Tümü (Konv. + Katılım)", "Sadece Katılım Uyumlu",
+        "BIST Katılım (XKTUM)", "TEFAS Katılım Fonları (53)", "İslami ETF & Sukuk",
     ]
     with f3:
         st.session_state.katilim_mode = st.selectbox(
-            "Katılım Modu",
-            options=katilim_options,
-            index=katilim_options.index(st.session_state.katilim_mode)
-            if st.session_state.katilim_mode in katilim_options
-            else 0,
+            "Katılım Modu", options=katilim_options,
+            index=katilim_options.index(st.session_state.katilim_mode) if st.session_state.katilim_mode in katilim_options else 0,
             label_visibility="collapsed",
         )
 
@@ -2805,29 +3051,23 @@ def main() -> None:
                 sub_opts = ["Tümü"] + sorted({s.category for s in snapshots.values() if s.market_group == mg})
 
             st.session_state.sub_filter = st.selectbox(
-                "Alt Endeks / Kategori",
-                options=sub_opts,
+                "Alt Endeks / Kategori", options=sub_opts,
                 index=sub_opts.index(st.session_state.sub_filter) if st.session_state.sub_filter in sub_opts else 0,
             )
             all_bist_sectors = sorted({s.sector for s in snapshots.values() if s.asset_class == "BIST_STOCK"})
             all_tefas_cats = sorted({s.category for s in snapshots.values() if s.asset_class == "TEFAS_FUND"})
             st.session_state.bist_sectors = st.multiselect("BIST Sektörleri", all_bist_sectors, default=st.session_state.bist_sectors)
             st.session_state.tefas_categories = st.multiselect("TEFAS Kategorileri", all_tefas_cats, default=st.session_state.tefas_categories)
-
             st.session_state.signal_actions = st.multiselect(
-                "Sinyal Durumu",
-                options=["GÜÇLÜ AL", "AL", "TUT / İZLE", "SAT", "SPK ENGELİ"],
-                default=st.session_state.signal_actions,
+                "Sinyal Durumu", ["GÜÇLÜ AL", "AL", "TUT / İZLE", "SAT", "SPK ENGELİ"], default=st.session_state.signal_actions
             )
             st.session_state.min_score = st.slider("Min. Skor", 0.0, 95.0, float(st.session_state.min_score), step=1.0)
-
             st.session_state.use_rsi_filter = st.checkbox("RSI Aralığı Uygula", value=st.session_state.use_rsi_filter)
             if st.session_state.use_rsi_filter:
                 st.session_state.rsi_range = st.slider("RSI-14", 0, 100, tuple(st.session_state.rsi_range))
             tc1, tc2 = st.columns(2)
             st.session_state.only_above_sma50 = tc1.checkbox("SMA50 Üstü", value=st.session_state.only_above_sma50)
             st.session_state.only_macd_bull = tc2.checkbox("MACD Pozitif", value=st.session_state.only_macd_bull)
-
             st.session_state.use_fund_filter = st.checkbox("Temel Çarpan Filtresi", value=st.session_state.use_fund_filter)
             if st.session_state.use_fund_filter:
                 fc1, fc2 = st.columns(2)
@@ -2839,7 +3079,7 @@ def main() -> None:
             st.session_state.hide_spk_blocked = st.checkbox("SPK Engellileri Gizle", value=st.session_state.hide_spk_blocked)
 
     # -------------------------------------------------------------------------
-    # 4. SCORE & FILTER UNIVERSE (SYNCED ACROSS ALL VIEWS)
+    # 4. SCORE & FILTER UNIVERSE
     # -------------------------------------------------------------------------
     filter_cfg = {
         "search_query": st.session_state.search_query,
@@ -2872,7 +3112,6 @@ def main() -> None:
     filtered_signals = [p[1] for p in filtered_pairs]
     filtered_sym_map = {p[0].symbol: p for p in filtered_pairs}
 
-    # Auto-sync selected_symbol when filter changes so every view stays relevant
     if filtered_pairs and st.session_state.selected_symbol not in filtered_sym_map:
         st.session_state.selected_symbol = filtered_pairs[0][0].symbol
 
@@ -2891,7 +3130,6 @@ def main() -> None:
         st.session_state.only_macd_bull,
     ])
 
-    # Slim Active Context Strip
     ctx_left, ctx_right = st.columns([5.8, 1.0])
     with ctx_left:
         st.markdown(
@@ -2909,15 +3147,33 @@ def main() -> None:
         )
     with ctx_right:
         if has_active_filter:
-            st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:9px;'></div>", unsafe_allow_html=True)
             if st.button("Sıfırla", use_container_width=True):
                 reset_all_filters()
                 st.rerun()
 
     # =========================================================================
-    # VIEW 1: GENEL BAKIŞ (BREATHABLE SPOTLIGHT + INTERCONNECTED WATCHLIST)
+    # VIEW 1: GENEL BAKIŞ (ENDEKSLER + KPI KARTLARI + ODAK + HAFTANIN PARLAYANLARI)
     # =========================================================================
     if active_page == "Genel Bakış":
+        # A. Piyasa Endeksleri & Makro Göstergeler Şeridi
+        idx_cards = compute_market_index_cards(snapshots)
+        idx_html_parts = []
+        for ic in idx_cards:
+            c_col = "#10B981" if ic["chg"] >= 0 else "#EF4444"
+            arrow = "▲" if ic["chg"] >= 0 else "▼"
+            idx_html_parts.append(
+                f"""
+                <div class="aq-index-card">
+                    <div class="aq-index-name">{html.escape(ic['label'])}</div>
+                    <div class="aq-index-val">{html.escape(ic['val'])}</div>
+                    <div class="aq-index-chg" style="color:{c_col};">{arrow} {ic['chg']:+.2f}% <span style="color:#64748B; font-weight:400;">· {html.escape(ic['sub'])}</span></div>
+                </div>
+                """
+            )
+        st.markdown(f"<div class='aq-index-grid'>{''.join(idx_html_parts)}</div>", unsafe_allow_html=True)
+
+        # B. 4-Kart KPI Özeti (Crisp horizontal cards, never plain text)
         buy_cnt = sum(1 for s in filtered_signals if s.action in ("GÜÇLÜ AL", "AL"))
         kat_cnt = sum(1 for s in filtered_signals if s.is_katilim)
         avg_sc = float(np.mean([s.composite_score for s in filtered_signals])) if filtered_signals else 0.0
@@ -2954,15 +3210,16 @@ def main() -> None:
         if not filtered_pairs:
             st.info("Seçili filtrelere uyan varlık bulunamadı. Sağ üstteki 'Sıfırla' ile tüm evrene dönebilirsiniz.")
         else:
+            # C. Hero Spotlight + Styled Watchlist
             hero_snap, hero_sig = filtered_sym_map.get(st.session_state.selected_symbol, filtered_pairs[0])
-            col_hero, col_watch = st.columns([3.4, 1.8], gap="large")
+            col_hero, col_watch = st.columns([3.3, 1.9], gap="large")
 
             with col_hero:
                 chg_cls = "aq-chg-pos" if hero_snap.change_pct >= 0 else "aq-chg-neg"
                 kat_tag = "<span class='aq-chip aq-chip-live' style='padding:2px 8px; font-size:11px;'>Katılım</span>" if hero_snap.is_katilim else ""
                 st.markdown(
                     f"""
-                    <div class="aq-card" style="padding-bottom:12px;">
+                    <div class="aq-card" style="padding-bottom:14px;">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
                             <div>
                                 <div style="display:flex; align-items:center; gap:8px;">
@@ -2970,7 +3227,7 @@ def main() -> None:
                                     <span class="{action_pill_class(hero_sig.action)}">{html.escape(hero_sig.action)}</span>
                                     {kat_tag}
                                 </div>
-                                <div style="font-size:13px; color:#94A3B8; margin-top:3px;">
+                                <div style="font-size:13px; color:#94A3B8; margin-top:4px;">
                                     {html.escape(hero_snap.name)} · {html.escape(hero_snap.market_group)} · {html.escape(hero_snap.sector)}
                                 </div>
                             </div>
@@ -2987,7 +3244,7 @@ def main() -> None:
                 )
                 st.plotly_chart(build_hero_area_chart(hero_snap), use_container_width=True, key=f"hero_{hero_snap.symbol}")
 
-                hb1, hb2, hb3 = st.columns([1.4, 1.4, 2.2])
+                hb1, hb2, hb3 = st.columns([1.45, 1.35, 2.2])
                 if hb1.button("Detaylı Teknik İncele →", type="primary", use_container_width=True):
                     focus_asset(hero_snap.symbol, go_to_detail=True)
                     st.rerun()
@@ -2998,10 +3255,10 @@ def main() -> None:
 
             with col_watch:
                 st.markdown("<div class='aq-section-title'>Filtrede Öne Çıkanlar</div>", unsafe_allow_html=True)
-                for idx_w, (w_snap, w_sig) in enumerate(filtered_pairs[:5]):
+                for idx_w, (w_snap, w_sig) in enumerate(filtered_pairs[:4]):
                     w_chg_cls = "aq-chg-pos" if w_snap.change_pct >= 0 else "aq-chg-neg"
                     is_sel = w_snap.symbol == hero_snap.symbol
-                    border_style = "border-color: rgba(59,130,246,0.55); background:#141B2B;" if is_sel else ""
+                    border_style = "border-color: rgba(59,130,246,0.55); background:#151D30;" if is_sel else ""
                     st.markdown(
                         f"""
                         <div class="aq-watch-card" style="{border_style}">
@@ -3012,8 +3269,8 @@ def main() -> None:
                                 </div>
                                 <div class="aq-price">{w_snap.last_price:,.2f} {w_snap.currency}</div>
                             </div>
-                            <div class="aq-watch-top" style="margin-top:4px;">
-                                <div class="aq-name" style="max-width:65%;">{html.escape(w_snap.name)}</div>
+                            <div class="aq-watch-top" style="margin-top:5px;">
+                                <div class="aq-name" style="max-width:62%;">{html.escape(w_snap.name)}</div>
                                 <div class="{w_chg_cls}">{w_snap.change_pct:+.2f}% · {w_sig.composite_score:.0f}p</div>
                             </div>
                         </div>
@@ -3028,91 +3285,154 @@ def main() -> None:
                         focus_asset(w_snap.symbol, go_to_detail=True)
                         st.rerun()
 
+            # D. Haftanın Parlayanları (Top Momentum & Hacim Liderleri)
+            st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div class='aq-section-title'>Haftanın Parlayanları <span class='aq-section-sub'>— Aktif kapsamdaki en güçlü 20 günlük momentum ve hacim liderleri</span></div>",
+                unsafe_allow_html=True,
+            )
+            shining_pairs = sorted(
+                filtered_pairs,
+                key=lambda x: x[0].indicators.get("mom_20d", 0.0) + x[0].indicators.get("vol_zscore", 0.0) * 2.5,
+                reverse=True,
+            )[:4]
+            sh_cols = st.columns(len(shining_pairs), gap="medium")
+            for idx_s, (sh_snap, sh_sig) in enumerate(shining_pairs):
+                mom20 = sh_snap.indicators.get("mom_20d", 0.0)
+                vz = sh_snap.indicators.get("vol_zscore", 0.0)
+                with sh_cols[idx_s]:
+                    st.markdown(
+                        f"""
+                        <div class="aq-shine-card">
+                            <div class="aq-shine-head">
+                                <span class="aq-sym">{html.escape(sh_snap.symbol)}</span>
+                                <span class="aq-shine-mom">20G {mom20:+.1f}%</span>
+                            </div>
+                            <div class="aq-name" style="margin-bottom:10px;">{html.escape(sh_snap.name)}</div>
+                            <div class="aq-watch-top">
+                                <span class="aq-price">{sh_snap.last_price:,.2f} {sh_snap.currency}</span>
+                                <span class="{action_pill_class(sh_sig.action)}">{sh_sig.composite_score:.0f}p</span>
+                            </div>
+                            <div style="font-size:11.5px; color:#64748B; margin-top:6px;">
+                                {html.escape(sh_snap.sector)} · Hacim Z: {vz:+.2f}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    if st.button("İncele →", key=f"shine_go_{idx_s}_{sh_snap.symbol}", use_container_width=True):
+                        focus_asset(sh_snap.symbol, go_to_detail=True)
+                        st.rerun()
+
     # =========================================================================
-    # VIEW 2: SİNYAL & TARAYICI (SPARKLINE TABLE + CLICK-TO-INSPECT DRAWER)
+    # VIEW 2: SİNYAL & TARAYICI (AKILLI PRESETLER + SPARKLINE TABLO)
     # =========================================================================
     elif active_page == "Sinyal & Tarayıcı":
         if not filtered_pairs:
             st.info("Bu filtre kombinasyonuyla eşleşen varlık bulunamadı.")
         else:
+            # 1-Click Smart Screener Presets
+            st.session_state.screener_preset = st.radio(
+                "Hızlı Tarama",
+                options=SCREENER_PRESETS,
+                index=SCREENER_PRESETS.index(st.session_state.screener_preset)
+                if st.session_state.screener_preset in SCREENER_PRESETS
+                else 0,
+                horizontal=True,
+                label_visibility="collapsed",
+            )
+            preset = st.session_state.screener_preset
+            if preset == "Güçlü Al (Skor 75+)":
+                active_pairs = [(s, g) for s, g in filtered_pairs if g.composite_score >= 75.0]
+            elif preset == "Dip Dönüş (RSI < 40)":
+                active_pairs = [(s, g) for s, g in filtered_pairs if g.rsi_14 < 40.0]
+            elif preset == "Hacim Patlaması (Z > 1.5)":
+                active_pairs = [(s, g) for s, g in filtered_pairs if g.vol_zscore > 1.5]
+            elif preset == "Değer Fırsatı (F/K < 12)":
+                active_pairs = [(s, g) for s, g in filtered_pairs if s.pe_ratio is not None and 0 < s.pe_ratio < 12.0]
+            else:
+                active_pairs = filtered_pairs
+
             top_bar_l, top_bar_r = st.columns([3.5, 1.3])
             with top_bar_l:
                 st.markdown(
-                    "<div class='aq-section-title'>Çoklu Varlık Sinyal Tablosu <span style='font-weight:400; color:#64748B; font-size:12.5px;'>— Detayını görmek için herhangi bir satıra tıklayın</span></div>",
+                    f"<div class='aq-section-title'>Çoklu Varlık Sinyal Tablosu ({len(active_pairs)} varlık) <span class='aq-section-sub'>— Detayı görmek için satıra tıklayın</span></div>",
                     unsafe_allow_html=True,
                 )
 
-            table_rows = []
-            shown_pairs = filtered_pairs[:160]
-            for snap, sig in shown_pairs:
-                spark = [round(float(x), 4) for x in snap.df["Close"].tail(30).tolist()]
-                table_rows.append({
-                    "Sembol": snap.symbol,
-                    "Varlık": snap.name[:32],
-                    "Piyasa": snap.market_group,
-                    "Katılım": "✓" if snap.is_katilim else "—",
-                    "Sinyal": sig.action,
-                    "Skor": sig.composite_score,
-                    "30G Trend": spark,
-                    "Fiyat": snap.last_price,
-                    "Birim": snap.currency,
-                    "Günlük %": snap.change_pct,
-                    "RSI": sig.rsi_14,
-                    "Stop-Loss": sig.stop_loss,
-                    "Take-Profit": sig.take_profit,
-                    "Pozisyon (TL)": sig.suggested_tl,
-                })
-            tbl_df = pd.DataFrame(table_rows)
+            if not active_pairs:
+                st.info(f"'{preset}' hazır taraması için mevcut filtrelerde eşleşme bulunamadı.")
+            else:
+                shown_pairs = active_pairs[:160]
+                table_rows = [
+                    {
+                        "Sembol": snap.symbol,
+                        "Varlık": snap.name[:32],
+                        "Piyasa": snap.market_group,
+                        "Katılım": "✓" if snap.is_katilim else "—",
+                        "Sinyal": sig.action,
+                        "Skor": sig.composite_score,
+                        "30G Trend": [round(float(x), 4) for x in snap.df["Close"].tail(30).tolist()],
+                        "Fiyat": snap.last_price,
+                        "Birim": snap.currency,
+                        "Günlük %": snap.change_pct,
+                        "RSI": sig.rsi_14,
+                        "Stop-Loss": sig.stop_loss,
+                        "Take-Profit": sig.take_profit,
+                        "Pozisyon (TL)": sig.suggested_tl,
+                    }
+                    for snap, sig in shown_pairs
+                ]
+                tbl_df = pd.DataFrame(table_rows)
 
-            with top_bar_r:
-                csv_df = tbl_df.drop(columns=["30G Trend"], errors="ignore")
-                st.download_button(
-                    "CSV Olarak İndir",
-                    data=csv_df.to_csv(index=False).encode("utf-8-sig"),
-                    file_name=f"alpquant_sinyaller_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
+                with top_bar_r:
+                    csv_df = tbl_df.drop(columns=["30G Trend"], errors="ignore")
+                    st.download_button(
+                        "CSV Olarak İndir",
+                        data=csv_df.to_csv(index=False).encode("utf-8-sig"),
+                        file_name=f"alpquant_sinyaller_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+
+                clicked_row = render_premium_dataframe(tbl_df, height=450, selectable=True)
+                if clicked_row is not None and 0 <= clicked_row < len(shown_pairs):
+                    st.session_state.selected_symbol = shown_pairs[clicked_row][0].symbol
+
+                sel_snap, sel_sig = filtered_sym_map.get(st.session_state.selected_symbol, shown_pairs[0])
+                st.markdown(
+                    f"""
+                    <div class="aq-card" style="margin-top:14px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                            <div>
+                                <span style="font-size:17px; font-weight:700; color:#F8FAFC;">{html.escape(sel_snap.symbol)}</span>
+                                <span style="font-size:13px; color:#94A3B8; margin-left:8px;">{html.escape(sel_snap.name)}</span>
+                                <span class="{action_pill_class(sel_sig.action)}" style="margin-left:10px;">{html.escape(sel_sig.action)} · {sel_sig.composite_score:.1f}p</span>
+                            </div>
+                            <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#CBD5E1;">
+                                Fiyat: <b>{sel_snap.last_price:,.2f} {sel_snap.currency}</b> &nbsp;|&nbsp;
+                                SL: <b style="color:#FCA5A5;">{sel_sig.stop_loss:,.2f}</b> &nbsp;|&nbsp;
+                                TP: <b style="color:#6EE7B7;">{sel_sig.take_profit:,.2f}</b> &nbsp;|&nbsp;
+                                Önerilen: <b>{sel_sig.suggested_qty:,} adet ({sel_sig.suggested_tl:,.0f} ₺)</b>
+                            </div>
+                        </div>
+                        <div style="margin-top:8px; font-size:12.5px; color:#94A3B8;">
+                            {" &nbsp;•&nbsp; ".join(html.escape(r) for r in sel_sig.reasons)}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
-
-            clicked_row = render_premium_dataframe(tbl_df, height=460, selectable=True)
-            if clicked_row is not None and 0 <= clicked_row < len(shown_pairs):
-                st.session_state.selected_symbol = shown_pairs[clicked_row][0].symbol
-
-            # Quick Inspector Drawer for Selected Row (Seamless Ergonomic Transition)
-            sel_snap, sel_sig = filtered_sym_map.get(st.session_state.selected_symbol, shown_pairs[0])
-            st.markdown(
-                f"""
-                <div class="aq-card" style="margin-top:14px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                        <div>
-                            <span style="font-size:17px; font-weight:700; color:#F8FAFC;">{html.escape(sel_snap.symbol)}</span>
-                            <span style="font-size:13px; color:#94A3B8; margin-left:8px;">{html.escape(sel_snap.name)}</span>
-                            <span class="{action_pill_class(sel_sig.action)}" style="margin-left:10px;">{html.escape(sel_sig.action)} · {sel_sig.composite_score:.1f}p</span>
-                        </div>
-                        <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#CBD5E1;">
-                            Fiyat: <b>{sel_snap.last_price:,.2f} {sel_snap.currency}</b> &nbsp;|&nbsp;
-                            SL: <b style="color:#FCA5A5;">{sel_sig.stop_loss:,.2f}</b> &nbsp;|&nbsp;
-                            TP: <b style="color:#6EE7B7;">{sel_sig.take_profit:,.2f}</b> &nbsp;|&nbsp;
-                            Önerilen: <b>{sel_sig.suggested_qty:,} adet ({sel_sig.suggested_tl:,.0f} ₺)</b>
-                        </div>
-                    </div>
-                    <div style="margin-top:8px; font-size:12.5px; color:#94A3B8;">
-                        {" &nbsp;•&nbsp; ".join(html.escape(r) for r in sel_sig.reasons)}
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            dr1, dr2, _ = st.columns([1.4, 1.4, 3.2])
-            if dr1.button(f"{sel_snap.symbol} Detay & Grafiğe Git →", type="primary", use_container_width=True):
-                focus_asset(sel_snap.symbol, go_to_detail=True)
-                st.rerun()
-            if dr2.button("Rapor & E-Posta Gönder", use_container_width=True):
-                st.session_state.active_page = "Rapor & Backtest"
-                st.rerun()
+                dr1, dr2, _ = st.columns([1.5, 1.4, 3.1])
+                if dr1.button(f"{sel_snap.symbol} Detay & Grafiğe Git →", type="primary", use_container_width=True):
+                    focus_asset(sel_snap.symbol, go_to_detail=True)
+                    st.rerun()
+                if dr2.button("Rapor & E-Posta Gönder", use_container_width=True):
+                    st.session_state.active_page = "Rapor & Backtest"
+                    st.rerun()
 
     # =========================================================================
-    # VIEW 3: VARLIK İNCELE (UNIFIED DEEP-DIVE WORKSPACE)
+    # VIEW 3: VARLIK İNCELE (UNIFIED DEEP-DIVE + BENZER VARLIKLAR)
     # =========================================================================
     elif active_page == "Varlık İncele":
         if not filtered_pairs:
@@ -3146,7 +3466,6 @@ def main() -> None:
                     unsafe_allow_html=True,
                 )
 
-            # Main Interactive Candlestick Chart
             live_df = (
                 MultiAssetDataFetcher().fetch_live_ohlcv_for_symbol(snap)
                 if st.session_state.use_live_yf_chart
@@ -3154,7 +3473,6 @@ def main() -> None:
             )
             st.plotly_chart(build_detailed_candlestick(snap, df_override=live_df), use_container_width=True, key=f"deep_{snap.symbol}")
 
-            # 2-Column Breathable Analysis & Inline Backtest
             d_left, d_right = st.columns([1.05, 1.15], gap="large")
             with d_left:
                 st.markdown("<div class='aq-section-title'>Kantitatif Özet & Risk Planı</div>", unsafe_allow_html=True)
@@ -3175,7 +3493,7 @@ def main() -> None:
                             <div><div class="aq-metric-label">ROE</div><div style="font-size:15px; font-weight:600; font-family:'JetBrains Mono',monospace;">{roe_txt}</div></div>
                             <div><div class="aq-metric-label">Fon TER</div><div style="font-size:15px; font-weight:600; font-family:'JetBrains Mono',monospace;">{ter_txt}</div></div>
                         </div>
-                        <div style="border-top:1px solid rgba(148,163,184,0.12); padding-top:12px; display:flex; justify-content:space-between; font-size:13px;">
+                        <div style="border-top:1px solid rgba(148,163,184,0.12); padding-top:12px; display:flex; justify-content:space-between; font-size:13px; flex-wrap:wrap; gap:8px;">
                             <div>Stop-Loss: <b style="color:#FCA5A5; font-family:'JetBrains Mono',monospace;">{sig.stop_loss:,.2f}</b></div>
                             <div>Take-Profit: <b style="color:#6EE7B7; font-family:'JetBrains Mono',monospace;">{sig.take_profit:,.2f}</b></div>
                             <div>Önerilen: <b style="font-family:'JetBrains Mono',monospace;">{sig.suggested_qty:,} adet ({sig.suggested_tl:,.0f} ₺)</b></div>
@@ -3198,10 +3516,68 @@ def main() -> None:
                 bm4.metric("Sharpe", f"{bt['sharpe']:.2f}")
                 st.plotly_chart(build_backtest_chart(bt, height=245), use_container_width=True, key=f"inline_bt_{snap.symbol}")
 
+            # Same-Sector Peer Comparison Strip
+            peers = [
+                (ps, pg) for ps, pg in filtered_pairs
+                if ps.symbol != snap.symbol and (ps.sector == snap.sector or ps.category == snap.category)
+            ][:3]
+            if peers:
+                st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"<div class='aq-section-title'>Aynı Sektör / Kategorideki Benzer Varlıklar <span class='aq-section-sub'>— {html.escape(snap.sector)}</span></div>",
+                    unsafe_allow_html=True,
+                )
+                p_cols = st.columns(len(peers), gap="medium")
+                for idx_p, (ps, pg) in enumerate(peers):
+                    p_chg_cls = "aq-chg-pos" if ps.change_pct >= 0 else "aq-chg-neg"
+                    with p_cols[idx_p]:
+                        st.markdown(
+                            f"""
+                            <div class="aq-watch-card">
+                                <div class="aq-watch-top">
+                                    <span class="aq-sym">{html.escape(ps.symbol)}</span>
+                                    <span class="{action_pill_class(pg.action)}">{html.escape(pg.action)} · {pg.composite_score:.0f}p</span>
+                                </div>
+                                <div class="aq-name" style="margin:4px 0 8px 0;">{html.escape(ps.name)}</div>
+                                <div class="aq-watch-top">
+                                    <span class="aq-price">{ps.last_price:,.2f} {ps.currency}</span>
+                                    <span class="{p_chg_cls}">{ps.change_pct:+.2f}%</span>
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                        if st.button(f"{ps.symbol} Karşılaştır →", key=f"peer_{idx_p}_{ps.symbol}", use_container_width=True):
+                            focus_asset(ps.symbol, go_to_detail=True)
+                            st.rerun()
+
     # =========================================================================
-    # VIEW 4: CANLI AKIŞ (EDITORIAL KAP & NEWS STREAM WITH 1-CLICK JUMP)
+    # VIEW 4: CANLI AKIŞ (DUYGU BAROMETRESİ + EDİTORYAL HABER KARTLARI)
     # =========================================================================
     elif active_page == "Canlı Akış":
+        kap_analyzer = KAPDisclosureAnalyzer(gemini_api_key=st.session_state.gemini_api_key)
+        live_disclosures = kap_analyzer.fetch_live_stream(
+            snapshots=snapshots, max_items=16, enable_live_rss=st.session_state.use_live_rss
+        )
+        analyses = [kap_analyzer.analyze_disclosure(d) for d in live_disclosures]
+
+        # Sentiment Barometer Strip
+        pos_n = sum(1 for a in analyses if a.sentiment == "OLUMLU")
+        neu_n = sum(1 for a in analyses if a.sentiment == "NÖTR")
+        neg_n = sum(1 for a in analyses if a.sentiment == "OLUMSUZ")
+        veto_n = sum(1 for a in analyses if a.sentiment == "HARD VETO")
+        st.markdown(
+            f"""
+            <div class="aq-metrics">
+                <div class="aq-metric-card"><div class="aq-metric-label">Olumlu Katalizör</div><div class="aq-metric-val" style="color:#10B981;">{pos_n}</div><div class="aq-metric-sub">Pozitif haber akışı</div></div>
+                <div class="aq-metric-card"><div class="aq-metric-label">Nötr / İzleme</div><div class="aq-metric-val">{neu_n}</div><div class="aq-metric-sub">Dengeli gelişmeler</div></div>
+                <div class="aq-metric-card"><div class="aq-metric-label">Olumsuz Baskı</div><div class="aq-metric-val" style="color:#EF4444;">{neg_n}</div><div class="aq-metric-sub">Risk / satış sinyali</div></div>
+                <div class="aq-metric-card"><div class="aq-metric-label">Hard Veto</div><div class="aq-metric-val" style="color:#F59E0B;">{veto_n}</div><div class="aq-metric-sub">Kritik tedbir uyarısı</div></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
         nf1, nf2 = st.columns([3.8, 1.2])
         with nf1:
             sent_filter = st.multiselect(
@@ -3215,15 +3591,7 @@ def main() -> None:
                 st.cache_data.clear()
                 st.rerun()
 
-        kap_analyzer = KAPDisclosureAnalyzer(gemini_api_key=st.session_state.gemini_api_key)
-        live_disclosures = kap_analyzer.fetch_live_stream(
-            snapshots=snapshots,
-            max_items=16,
-            enable_live_rss=st.session_state.use_live_rss,
-        )
-        analyses = [kap_analyzer.analyze_disclosure(d) for d in live_disclosures]
         shown = [a for a in analyses if a.sentiment in sent_filter]
-
         if not shown:
             st.info("Seçili etki filtresine uygun güncel haber bulunamadı.")
         else:
@@ -3263,13 +3631,13 @@ def main() -> None:
                     unsafe_allow_html=True,
                 )
                 if d.symbol in snapshots:
-                    nc1, _ = st.columns([1.3, 4.7])
+                    nc1, _ = st.columns([1.4, 4.6])
                     if nc1.button(f"{d.symbol} Grafiğini Aç →", key=f"news_jump_{idx_n}_{d.id}", use_container_width=True):
                         focus_asset(d.symbol, go_to_detail=True)
                         st.rerun()
 
     # =========================================================================
-    # VIEW 5: RAPOR & BACKTEST (PDF EXPORT + DARK-MODE EMAIL DISPATCH)
+    # VIEW 5: RAPOR & BACKTEST (PORTFÖY ÖNERİSİ + PDF + DARK-MODE E-POSTA)
     # =========================================================================
     else:
         r_left, r_right = st.columns([1.3, 1.0], gap="large")
@@ -3278,9 +3646,7 @@ def main() -> None:
             bt_choices = [p[0].symbol for p in filtered_pairs[:120]] or list(snapshots.keys())[:25]
             default_idx = bt_choices.index(st.session_state.selected_symbol) if st.session_state.selected_symbol in bt_choices else 0
             bt_sym = st.selectbox(
-                "Backtest Varlığı",
-                options=bt_choices,
-                index=default_idx,
+                "Backtest Varlığı", options=bt_choices, index=default_idx,
                 format_func=lambda s: f"{s} — {snapshots[s].name}",
             )
             st.session_state.selected_symbol = bt_sym
@@ -3290,7 +3656,7 @@ def main() -> None:
             m2.metric("Al & Tut", f"%{bt_res['bh_ret_pct']:+.2f}")
             m3.metric("Maks. DD", f"%{bt_res['max_dd_pct']:.2f}")
             m4.metric("Sharpe", f"{bt_res['sharpe']:.2f}")
-            st.plotly_chart(build_backtest_chart(bt_res, height=310), use_container_width=True, key=f"rep_bt_{bt_sym}")
+            st.plotly_chart(build_backtest_chart(bt_res, height=305), use_container_width=True, key=f"rep_bt_{bt_sym}")
 
         with r_right:
             st.markdown("<div class='aq-section-title'>Kurumsal Rapor & E-Posta Gönderimi</div>", unsafe_allow_html=True)
@@ -3307,17 +3673,26 @@ def main() -> None:
             html_report = EmailSignalNotifier.build_html_report(filtered_signals, profile, st.session_state.katilim_mode)
             if st.button("Filtrelenen Sinyalleri E-Posta Gönder", use_container_width=True):
                 ok, msg = EmailSignalNotifier.send_email(
-                    st.session_state.smtp_user,
-                    st.session_state.smtp_pass,
-                    st.session_state.email_recipient,
-                    f"AlpQuant Pro v5.0 Sinyal Raporu ({len(filtered_signals)} Varlık)",
-                    html_report,
+                    st.session_state.smtp_user, st.session_state.smtp_pass, st.session_state.email_recipient,
+                    f"AlpQuant Pro v5.1 Sinyal Raporu ({len(filtered_signals)} Varlık)", html_report,
                 )
                 if ok:
                     st.success(msg)
                 else:
                     st.warning(msg)
-            st.caption(f"Alıcı: {st.session_state.email_recipient} (Ayarlar menüsünden değiştirebilirsiniz).")
+            st.caption(f"Alıcı: {st.session_state.email_recipient} · Sermaye: {st.session_state.total_capital_tl:,.0f} ₺")
+
+            # Compact Top-5 Allocation Preview
+            top_buys = [s for s in filtered_signals if s.action in ("GÜÇLÜ AL", "AL") and s.suggested_tl > 0][:5]
+            if top_buys:
+                st.markdown("<div class='aq-section-title' style='margin-top:16px;'>Örnek Sepet Dağılımı (İlk 5 AL)</div>", unsafe_allow_html=True)
+                alloc_rows = [
+                    f"<div class='aq-watch-top' style='padding:6px 0; border-bottom:1px solid rgba(148,163,184,0.10); font-size:12.5px;'>"
+                    f"<span><b>{html.escape(s.symbol)}</b> <span style='color:#94A3B8;'>({s.suggested_qty:,} adet)</span></span>"
+                    f"<span style='font-family:JetBrains Mono,monospace; color:#6EE7B7;'>{s.suggested_tl:,.0f} ₺</span></div>"
+                    for s in top_buys
+                ]
+                st.markdown(f"<div class='aq-card' style='padding:12px 16px;'>{''.join(alloc_rows)}</div>", unsafe_allow_html=True)
 
         with st.expander("E-Posta HTML Raporu Canlı Önizleme", expanded=False):
             st.markdown(html_report, unsafe_allow_html=True)
