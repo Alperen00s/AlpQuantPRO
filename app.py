@@ -2197,7 +2197,7 @@ class EmailSignalNotifier:
                 """
             )
 
-        return f"""
+        raw_html = f"""
         <div style="background-color:#0B0F17; color:#F8FAFC; font-family:Inter, -apple-system, BlinkMacSystemFont, sans-serif; border:1px solid #1E293B; border-radius:10px; overflow:hidden;">
             <div style="background:linear-gradient(90deg, #0F172A 0%, #172554 100%); padding:18px 20px; border-bottom:2px solid #2563EB;">
                 <div style="font-size:18px; font-weight:800; color:#F8FAFC; letter-spacing:-0.01em;">AlpQuant Pro v4.2 — Çoklu Varlık Kantitatif Sinyal Raporu</div>
@@ -2225,6 +2225,7 @@ class EmailSignalNotifier:
             </table>
         </div>
         """
+        return "\n".join(line.lstrip() for line in raw_html.splitlines() if line.strip())
 
     @staticmethod
     def send_email(
@@ -2652,6 +2653,11 @@ def inject_terminal_css() -> None:
     """Always inject full embedded CSS so styling NEVER degrades even without external style.css."""
     st.markdown(EMBEDDED_CSS, unsafe_allow_html=True)
 
+def render_html(markup: str) -> None:
+    """Strip leading indentation on every line so Streamlit Markdown never renders HTML as a code block."""
+    clean = "\n".join(line.lstrip() for line in str(markup).splitlines() if line.strip())
+    st.markdown(clean, unsafe_allow_html=True)
+
 
 def action_pill_class(action: str) -> str:
     if action in ("GÜÇLÜ AL", "AL"):
@@ -2927,8 +2933,7 @@ def main() -> None:
         if live_quote_count > 0
         else "<span class='aq-chip'>● Kalibre Terminal</span>"
     )
-    st.markdown(
-        f"""
+    render_html(f"""
         <div class="aq-header">
             <div class="aq-brand-wrap">
                 <div class="aq-mark">◈</div>
@@ -2944,9 +2949,7 @@ def main() -> None:
                 <span class="aq-chip aq-chip-blue">SPK Seviye {profile.risk_score}/5</span>
             </div>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        """)
 
     # -------------------------------------------------------------------------
     # 2. SLEEK SEGMENTED NAVIGATION + SETTINGS POPOVER
@@ -3132,8 +3135,7 @@ def main() -> None:
 
     ctx_left, ctx_right = st.columns([5.8, 1.0])
     with ctx_left:
-        st.markdown(
-            f"""
+        render_html(f"""
             <div class="aq-context-bar">
                 <div>
                     Aktif Kapsam: <b>{html.escape(st.session_state.market_group)}</b> ·
@@ -3142,12 +3144,10 @@ def main() -> None:
                 </div>
                 <div>Odak Varlık: <b>{html.escape(st.session_state.selected_symbol)}</b></div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            """)
     with ctx_right:
         if has_active_filter:
-            st.markdown("<div style='height:9px;'></div>", unsafe_allow_html=True)
+            render_html("<div style='height:9px;'></div>")
             if st.button("Sıfırla", use_container_width=True):
                 reset_all_filters()
                 st.rerun()
@@ -3171,7 +3171,7 @@ def main() -> None:
                 </div>
                 """
             )
-        st.markdown(f"<div class='aq-index-grid'>{''.join(idx_html_parts)}</div>", unsafe_allow_html=True)
+        render_html(f"<div class='aq-index-grid'>{''.join(idx_html_parts)}</div>")
 
         # B. 4-Kart KPI Özeti (Crisp horizontal cards, never plain text)
         buy_cnt = sum(1 for s in filtered_signals if s.action in ("GÜÇLÜ AL", "AL"))
@@ -3179,8 +3179,7 @@ def main() -> None:
         avg_sc = float(np.mean([s.composite_score for s in filtered_signals])) if filtered_signals else 0.0
         top_s = filtered_signals[0] if filtered_signals else None
 
-        st.markdown(
-            f"""
+        render_html(f"""
             <div class="aq-metrics">
                 <div class="aq-metric-card">
                     <div class="aq-metric-label">Taranan Kapsam</div>
@@ -3203,9 +3202,7 @@ def main() -> None:
                     <div class="aq-metric-sub">{f'Lider: {html.escape(top_s.symbol)} ({top_s.composite_score:.1f})' if top_s else 'Eşleşme yok'}</div>
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            """)
 
         if not filtered_pairs:
             st.info("Seçili filtrelere uyan varlık bulunamadı. Sağ üstteki 'Sıfırla' ile tüm evrene dönebilirsiniz.")
@@ -3217,8 +3214,7 @@ def main() -> None:
             with col_hero:
                 chg_cls = "aq-chg-pos" if hero_snap.change_pct >= 0 else "aq-chg-neg"
                 kat_tag = "<span class='aq-chip aq-chip-live' style='padding:2px 8px; font-size:11px;'>Katılım</span>" if hero_snap.is_katilim else ""
-                st.markdown(
-                    f"""
+                render_html(f"""
                     <div class="aq-card" style="padding-bottom:14px;">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
                             <div>
@@ -3239,9 +3235,7 @@ def main() -> None:
                             </div>
                         </div>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                    """)
                 st.plotly_chart(build_hero_area_chart(hero_snap), use_container_width=True, key=f"hero_{hero_snap.symbol}")
 
                 hb1, hb2, hb3 = st.columns([1.45, 1.35, 2.2])
@@ -3254,13 +3248,12 @@ def main() -> None:
                 hb3.caption(f"Öne çıkan gerekçe: {hero_sig.reasons[0]}")
 
             with col_watch:
-                st.markdown("<div class='aq-section-title'>Filtrede Öne Çıkanlar</div>", unsafe_allow_html=True)
+                render_html("<div class='aq-section-title'>Filtrede Öne Çıkanlar</div>")
                 for idx_w, (w_snap, w_sig) in enumerate(filtered_pairs[:4]):
                     w_chg_cls = "aq-chg-pos" if w_snap.change_pct >= 0 else "aq-chg-neg"
                     is_sel = w_snap.symbol == hero_snap.symbol
                     border_style = "border-color: rgba(59,130,246,0.55); background:#151D30;" if is_sel else ""
-                    st.markdown(
-                        f"""
+                    render_html(f"""
                         <div class="aq-watch-card" style="{border_style}">
                             <div class="aq-watch-top">
                                 <div>
@@ -3274,9 +3267,7 @@ def main() -> None:
                                 <div class="{w_chg_cls}">{w_snap.change_pct:+.2f}% · {w_sig.composite_score:.0f}p</div>
                             </div>
                         </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                        """)
                     wc1, wc2 = st.columns(2)
                     if wc1.button("Grafiğe Al", key=f"ov_pick_{idx_w}_{w_snap.symbol}", use_container_width=True):
                         focus_asset(w_snap.symbol, go_to_detail=False)
@@ -3286,11 +3277,8 @@ def main() -> None:
                         st.rerun()
 
             # D. Haftanın Parlayanları (Top Momentum & Hacim Liderleri)
-            st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
-            st.markdown(
-                "<div class='aq-section-title'>Haftanın Parlayanları <span class='aq-section-sub'>— Aktif kapsamdaki en güçlü 20 günlük momentum ve hacim liderleri</span></div>",
-                unsafe_allow_html=True,
-            )
+            render_html("<div style='height:12px;'></div>")
+            render_html("<div class='aq-section-title'>Haftanın Parlayanları <span class='aq-section-sub'>— Aktif kapsamdaki en güçlü 20 günlük momentum ve hacim liderleri</span></div>")
             shining_pairs = sorted(
                 filtered_pairs,
                 key=lambda x: x[0].indicators.get("mom_20d", 0.0) + x[0].indicators.get("vol_zscore", 0.0) * 2.5,
@@ -3301,8 +3289,7 @@ def main() -> None:
                 mom20 = sh_snap.indicators.get("mom_20d", 0.0)
                 vz = sh_snap.indicators.get("vol_zscore", 0.0)
                 with sh_cols[idx_s]:
-                    st.markdown(
-                        f"""
+                    render_html(f"""
                         <div class="aq-shine-card">
                             <div class="aq-shine-head">
                                 <span class="aq-sym">{html.escape(sh_snap.symbol)}</span>
@@ -3317,9 +3304,7 @@ def main() -> None:
                                 {html.escape(sh_snap.sector)} · Hacim Z: {vz:+.2f}
                             </div>
                         </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                        """)
                     if st.button("İncele →", key=f"shine_go_{idx_s}_{sh_snap.symbol}", use_container_width=True):
                         focus_asset(sh_snap.symbol, go_to_detail=True)
                         st.rerun()
@@ -3355,10 +3340,7 @@ def main() -> None:
 
             top_bar_l, top_bar_r = st.columns([3.5, 1.3])
             with top_bar_l:
-                st.markdown(
-                    f"<div class='aq-section-title'>Çoklu Varlık Sinyal Tablosu ({len(active_pairs)} varlık) <span class='aq-section-sub'>— Detayı görmek için satıra tıklayın</span></div>",
-                    unsafe_allow_html=True,
-                )
+                render_html(f"<div class='aq-section-title'>Çoklu Varlık Sinyal Tablosu ({len(active_pairs)} varlık) <span class='aq-section-sub'>— Detayı görmek için satıra tıklayın</span></div>")
 
             if not active_pairs:
                 st.info(f"'{preset}' hazır taraması için mevcut filtrelerde eşleşme bulunamadı.")
@@ -3400,8 +3382,7 @@ def main() -> None:
                     st.session_state.selected_symbol = shown_pairs[clicked_row][0].symbol
 
                 sel_snap, sel_sig = filtered_sym_map.get(st.session_state.selected_symbol, shown_pairs[0])
-                st.markdown(
-                    f"""
+                render_html(f"""
                     <div class="aq-card" style="margin-top:14px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                             <div>
@@ -3420,9 +3401,7 @@ def main() -> None:
                             {" &nbsp;•&nbsp; ".join(html.escape(r) for r in sel_sig.reasons)}
                         </div>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                    """)
                 dr1, dr2, _ = st.columns([1.5, 1.4, 3.1])
                 if dr1.button(f"{sel_snap.symbol} Detay & Grafiğe Git →", type="primary", use_container_width=True):
                     focus_asset(sel_snap.symbol, go_to_detail=True)
@@ -3455,16 +3434,13 @@ def main() -> None:
             snap, sig = filtered_sym_map[chosen]
             chg_cls = "aq-chg-pos" if snap.change_pct >= 0 else "aq-chg-neg"
             with sel_top2:
-                st.markdown(
-                    f"""
+                render_html(f"""
                     <div style="display:flex; justify-content:flex-end; align-items:center; gap:14px; padding-top:22px;">
                         <span class="{action_pill_class(sig.action)}" style="font-size:12.5px; padding:5px 12px;">{html.escape(sig.action)} · {sig.composite_score:.1f}/100</span>
                         <span style="font-size:22px; font-weight:700; font-family:'JetBrains Mono', monospace; color:#F8FAFC;">{snap.last_price:,.2f} {snap.currency}</span>
                         <span class="{chg_cls}" style="font-size:14px;">{snap.change_pct:+.2f}%</span>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                    """)
 
             live_df = (
                 MultiAssetDataFetcher().fetch_live_ohlcv_for_symbol(snap)
@@ -3475,13 +3451,12 @@ def main() -> None:
 
             d_left, d_right = st.columns([1.05, 1.15], gap="large")
             with d_left:
-                st.markdown("<div class='aq-section-title'>Kantitatif Özet & Risk Planı</div>", unsafe_allow_html=True)
+                render_html("<div class='aq-section-title'>Kantitatif Özet & Risk Planı</div>")
                 pe_txt = f"{snap.pe_ratio:.1f}x" if snap.pe_ratio is not None else "—"
                 pb_txt = f"{snap.pb_ratio:.2f}x" if snap.pb_ratio is not None else "—"
                 roe_txt = f"%{snap.roe_pct:.1f}" if snap.roe_pct is not None else "—"
                 ter_txt = f"%{snap.ter_pct:.2f}" if snap.ter_pct is not None else "—"
-                st.markdown(
-                    f"""
+                render_html(f"""
                     <div class="aq-card">
                         <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:14px;">
                             <div><div class="aq-metric-label">RSI-14</div><div style="font-size:16px; font-weight:600; font-family:'JetBrains Mono',monospace;">{sig.rsi_14:.1f}</div></div>
@@ -3502,12 +3477,10 @@ def main() -> None:
                             {"<br>".join("• " + html.escape(r) for r in sig.reasons)}
                         </div>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                    """)
 
             with d_right:
-                st.markdown(f"<div class='aq-section-title'>{html.escape(snap.symbol)} Strateji Performansı (Backtest)</div>", unsafe_allow_html=True)
+                render_html(f"<div class='aq-section-title'>{html.escape(snap.symbol)} Strateji Performansı (Backtest)</div>")
                 bt = run_strategy_backtest(snap.df, initial_capital=st.session_state.total_capital_tl)
                 bm1, bm2, bm3, bm4 = st.columns(4)
                 bm1.metric("Strateji", f"%{bt['total_ret_pct']:+.1f}")
@@ -3522,17 +3495,13 @@ def main() -> None:
                 if ps.symbol != snap.symbol and (ps.sector == snap.sector or ps.category == snap.category)
             ][:3]
             if peers:
-                st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
-                st.markdown(
-                    f"<div class='aq-section-title'>Aynı Sektör / Kategorideki Benzer Varlıklar <span class='aq-section-sub'>— {html.escape(snap.sector)}</span></div>",
-                    unsafe_allow_html=True,
-                )
+                render_html("<div style='height:8px;'></div>")
+                render_html(f"<div class='aq-section-title'>Aynı Sektör / Kategorideki Benzer Varlıklar <span class='aq-section-sub'>— {html.escape(snap.sector)}</span></div>")
                 p_cols = st.columns(len(peers), gap="medium")
                 for idx_p, (ps, pg) in enumerate(peers):
                     p_chg_cls = "aq-chg-pos" if ps.change_pct >= 0 else "aq-chg-neg"
                     with p_cols[idx_p]:
-                        st.markdown(
-                            f"""
+                        render_html(f"""
                             <div class="aq-watch-card">
                                 <div class="aq-watch-top">
                                     <span class="aq-sym">{html.escape(ps.symbol)}</span>
@@ -3544,9 +3513,7 @@ def main() -> None:
                                     <span class="{p_chg_cls}">{ps.change_pct:+.2f}%</span>
                                 </div>
                             </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
+                            """)
                         if st.button(f"{ps.symbol} Karşılaştır →", key=f"peer_{idx_p}_{ps.symbol}", use_container_width=True):
                             focus_asset(ps.symbol, go_to_detail=True)
                             st.rerun()
@@ -3566,17 +3533,14 @@ def main() -> None:
         neu_n = sum(1 for a in analyses if a.sentiment == "NÖTR")
         neg_n = sum(1 for a in analyses if a.sentiment == "OLUMSUZ")
         veto_n = sum(1 for a in analyses if a.sentiment == "HARD VETO")
-        st.markdown(
-            f"""
+        render_html(f"""
             <div class="aq-metrics">
                 <div class="aq-metric-card"><div class="aq-metric-label">Olumlu Katalizör</div><div class="aq-metric-val" style="color:#10B981;">{pos_n}</div><div class="aq-metric-sub">Pozitif haber akışı</div></div>
                 <div class="aq-metric-card"><div class="aq-metric-label">Nötr / İzleme</div><div class="aq-metric-val">{neu_n}</div><div class="aq-metric-sub">Dengeli gelişmeler</div></div>
                 <div class="aq-metric-card"><div class="aq-metric-label">Olumsuz Baskı</div><div class="aq-metric-val" style="color:#EF4444;">{neg_n}</div><div class="aq-metric-sub">Risk / satış sinyali</div></div>
                 <div class="aq-metric-card"><div class="aq-metric-label">Hard Veto</div><div class="aq-metric-val" style="color:#F59E0B;">{veto_n}</div><div class="aq-metric-sub">Kritik tedbir uyarısı</div></div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            """)
 
         nf1, nf2 = st.columns([3.8, 1.2])
         with nf1:
@@ -3611,8 +3575,7 @@ def main() -> None:
                     if d.link
                     else ""
                 )
-                st.markdown(
-                    f"""
+                render_html(f"""
                     <div class="aq-news">
                         <div class="aq-news-meta">
                             <div>
@@ -3627,9 +3590,7 @@ def main() -> None:
                             <b style="color:#F1F5F9;">AI Değerlendirme ({html.escape(a.impact_tag)}):</b> {html.escape(a.ai_commentary)}
                         </div>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                    """)
                 if d.symbol in snapshots:
                     nc1, _ = st.columns([1.4, 4.6])
                     if nc1.button(f"{d.symbol} Grafiğini Aç →", key=f"news_jump_{idx_n}_{d.id}", use_container_width=True):
@@ -3642,7 +3603,7 @@ def main() -> None:
     else:
         r_left, r_right = st.columns([1.3, 1.0], gap="large")
         with r_left:
-            st.markdown("<div class='aq-section-title'>Strateji Backtest Karşılaştırması</div>", unsafe_allow_html=True)
+            render_html("<div class='aq-section-title'>Strateji Backtest Karşılaştırması</div>")
             bt_choices = [p[0].symbol for p in filtered_pairs[:120]] or list(snapshots.keys())[:25]
             default_idx = bt_choices.index(st.session_state.selected_symbol) if st.session_state.selected_symbol in bt_choices else 0
             bt_sym = st.selectbox(
@@ -3659,7 +3620,7 @@ def main() -> None:
             st.plotly_chart(build_backtest_chart(bt_res, height=305), use_container_width=True, key=f"rep_bt_{bt_sym}")
 
         with r_right:
-            st.markdown("<div class='aq-section-title'>Kurumsal Rapor & E-Posta Gönderimi</div>", unsafe_allow_html=True)
+            render_html("<div class='aq-section-title'>Kurumsal Rapor & E-Posta Gönderimi</div>")
             pdf_bytes = generate_pdf_bytes(filtered_signals, profile)
             st.download_button(
                 "Sinyal Raporunu PDF İndir" if HAS_FPDF else "Sinyal Raporunu İndir (TXT)",
@@ -3669,7 +3630,7 @@ def main() -> None:
                 use_container_width=True,
                 type="primary",
             )
-            st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+            render_html("<div style='height:8px;'></div>")
             html_report = EmailSignalNotifier.build_html_report(filtered_signals, profile, st.session_state.katilim_mode)
             if st.button("Filtrelenen Sinyalleri E-Posta Gönder", use_container_width=True):
                 ok, msg = EmailSignalNotifier.send_email(
@@ -3685,17 +3646,17 @@ def main() -> None:
             # Compact Top-5 Allocation Preview
             top_buys = [s for s in filtered_signals if s.action in ("GÜÇLÜ AL", "AL") and s.suggested_tl > 0][:5]
             if top_buys:
-                st.markdown("<div class='aq-section-title' style='margin-top:16px;'>Örnek Sepet Dağılımı (İlk 5 AL)</div>", unsafe_allow_html=True)
+                render_html("<div class='aq-section-title' style='margin-top:16px;'>Örnek Sepet Dağılımı (İlk 5 AL)</div>")
                 alloc_rows = [
                     f"<div class='aq-watch-top' style='padding:6px 0; border-bottom:1px solid rgba(148,163,184,0.10); font-size:12.5px;'>"
                     f"<span><b>{html.escape(s.symbol)}</b> <span style='color:#94A3B8;'>({s.suggested_qty:,} adet)</span></span>"
                     f"<span style='font-family:JetBrains Mono,monospace; color:#6EE7B7;'>{s.suggested_tl:,.0f} ₺</span></div>"
                     for s in top_buys
                 ]
-                st.markdown(f"<div class='aq-card' style='padding:12px 16px;'>{''.join(alloc_rows)}</div>", unsafe_allow_html=True)
+                render_html(f"<div class='aq-card' style='padding:12px 16px;'>{''.join(alloc_rows)}</div>")
 
         with st.expander("E-Posta HTML Raporu Canlı Önizleme", expanded=False):
-            st.markdown(html_report, unsafe_allow_html=True)
+            render_html(html_report)
 
 
 if __name__ == "__main__":
