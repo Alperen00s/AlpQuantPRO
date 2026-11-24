@@ -50,7 +50,7 @@ except Exception:
 # 1. PAGE CONFIG & TURKISH NORMALIZATION HELPERS
 # =============================================================================
 st.set_page_config(
-    page_title="AlpQuant Pro v7.1 | Kurumsal Yatırım Platformu",
+    page_title="AlpQuant Pro v7.2 | Kurumsal Yatırım Platformu",
     page_icon="◈",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -753,7 +753,7 @@ def _build_full_universe_catalog() -> List[Dict[str, Any]]:
         ("KLU", "Kuveyt Türk Portföy Para Piyasası Katılım Fonu", "Katılım Para Piyasası", 1, 2.48, 0.95),
         ("KIS", "Kuveyt Türk Portföy Sürdürülebilirlik Katılım Fonu", "Katılım Hisse Senedi", 4, 3.12, 2.05),
         ("KTT", "Kuveyt Türk Portföy Teknoloji Katılım Fonu", "Katılım Teknoloji", 4, 2.94, 2.25),
-        ("KPU", "Kuveyt Türk Portföy Çoklu Varlık Katılım Fonu", "Katılım Değişken", 3, 3.65, 1.85),
+        ("KPU", "Kuveyt Türk Portföy İkinci Katılım Hisse Senedi (TL) Fonu", "Katılım Hisse Senedi", 4, 3.28, 2.05),
         ("KTN", "Kuveyt Türk Portföy Birinci Katılım Fonu", "Katılım Değişken", 3, 4.18, 1.80),
         ("KUT", "Kuveyt Türk Portföy Kıymetli Madenler Katılım Fonu", "Kıymetli Maden / Altın", 3, 6.42, 1.60),
         ("MPS", "Mükafat Portföy Katılım Hisse Senedi Fonu", "Katılım Hisse Senedi", 4, 12.85, 2.15),
@@ -1523,7 +1523,7 @@ def _extend_universe_catalog(catalog: List[Dict[str, Any]]) -> List[Dict[str, An
 
     extra_tefas = [
         ("IHK", "İş Portföy BIST Katılım 100 Endeksi Hisse Fonu", "Katılım Hisse Senedi", True, 4, 8.45, 1.95),
-        ("KPC", "Kuveyt Türk Portföy Katılım Hisse (Döviz) Fonu", "Katılım Hisse Senedi", True, 4, 6.18, 2.05),
+        ("KPC", "Kuveyt Türk Portföy Katılım Hisse Senedi (TL) Fonu", "Katılım Hisse Senedi", True, 4, 8.95, 2.05),
         ("KSV", "Kuveyt Türk Portföy Katılım Serbest Fon", "Katılım Değişken", True, 4, 5.42, 1.90),
         ("KAV", "Kuveyt Türk Portföy Agresif Katılım Fonu", "Katılım Değişken", True, 5, 4.95, 2.15),
         ("KRF", "Kuveyt Türk Portföy Kira Sertifikası Döviz Fonu", "Katılım Döviz / Eurobond", True, 3, 4.32, 1.40),
@@ -1776,6 +1776,93 @@ class MultiAssetDataFetcher:
     TV_BIST_URL = "https://scanner.tradingview.com/turkey/scan"
     TV_US_URL = "https://scanner.tradingview.com/america/scan"
 
+    TEFAS_API_URL = "https://www.tefas.gov.tr/api/DB/BindHistoryInfo"
+
+    @staticmethod
+    def _infer_tefas_category(title: str) -> Tuple[str, bool, int]:
+        low = normalize_turkish_lower(title)
+        is_kat = "katılım" in low or "katilim" in low or "kira sertifik" in low or "sukuk" in low
+        if "para piyasası" in low or "para piyasasi" in low or "likit" in low:
+            return ("Katılım Para Piyasası" if is_kat else "Para Piyasası"), is_kat, 1
+        if "kira sertifik" in low or "sukuk" in low:
+            return "Kira Sertifikası (Sukuk)", True, 1 if "kısa vadeli" in low or "kisa vadeli" in low else 2
+        if "altın" in low or "altin" in low:
+            return "Kıymetli Maden / Altın", is_kat, 3
+        if "gümüş" in low or "gumus" in low:
+            return "Kıymetli Maden / Gümüş", is_kat, 4
+        if "teknoloji" in low or "yarı iletken" in low or "blokzincir" in low:
+            return ("Katılım Teknoloji" if is_kat else "Yabancı Hisse & Teknoloji"), is_kat, 4
+        if "hisse senedi" in low or "hisse" in low:
+            return ("Katılım Hisse Senedi" if is_kat else "Hisse Senedi (TL)"), is_kat, 4
+        if "eurobond" in low or "döviz" in low or "doviz" in low:
+            return ("Katılım Döviz / Eurobond" if is_kat else "Döviz & Eurobond"), is_kat, 3
+        if "borçlanma" in low or "borclanma" in low:
+            return "Borçlanma Araçları", is_kat, 2
+        return ("Katılım Değişken" if is_kat else "Değişken & Karma"), is_kat, 3
+
+    @classmethod
+    def fetch_tefas_live_quotes(cls) -> Dict[str, Dict[str, Any]]:
+        """Fetches real official fund titles & daily NAV prices directly from TEFAS."""
+        try:
+            end_dt = datetime.now(timezone.utc)
+            start_dt = end_dt - timedelta(days=7)
+            form_data = urllib.parse.urlencode({
+                "fontip": "YAT",
+                "sfontur": "",
+                "fonkod": "",
+                "fongrup": "",
+                "bastarih": start_dt.strftime("%d.%m.%Y"),
+                "bittarih": end_dt.strftime("%d.%m.%Y"),
+                "fonturkod": "",
+                "fonunvantip": "",
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                cls.TEFAS_API_URL,
+                data=form_data,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "User-Agent": "Mozilla/5.0",
+                    "Referer": "https://www.tefas.gov.tr/TarihselVeriler.aspx",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                raw = json.loads(resp.read().decode("utf-8"))
+            rows = raw.get("data", [])
+            if not rows:
+                return {}
+            grouped: Dict[str, List[Tuple[int, float, str]]] = {}
+            for r in rows:
+                code = str(r.get("FONKODU") or "").strip().upper()
+                px = r.get("FIYAT")
+                if not code or px is None or float(px) <= 0:
+                    continue
+                ts = int(r.get("TARIH") or 0)
+                title = str(r.get("FONUNVAN") or code).strip()
+                grouped.setdefault(code, []).append((ts, float(px), title))
+            out: Dict[str, Dict[str, Any]] = {}
+            for code, pts in grouped.items():
+                pts.sort(key=lambda x: x[0])
+                last_px = pts[-1][1]
+                prev_px = pts[-2][1] if len(pts) >= 2 else last_px
+                chg = ((last_px - prev_px) / max(prev_px, 1e-9)) * 100.0
+                title = pts[-1][2]
+                cat, is_kat, rl = cls._infer_tefas_category(title)
+                out[code] = {
+                    "name": title,
+                    "close": round(last_px, 6 if last_px < 1 else 4),
+                    "change_pct": round(chg, 2),
+                    "category": cat,
+                    "is_katilim": is_kat,
+                    "risk_level": rl,
+                    "source": "Canlı TEFAS",
+                }
+            return out
+        except Exception:
+            return {}
+
+
     @staticmethod
     def generate_synthetic_ohlcv(
         symbol: str, base_price: float, days: int = 120, risk_level: int = 3
@@ -1869,7 +1956,7 @@ class MultiAssetDataFetcher:
             df.iloc[-1, df.columns.get_loc("Close")] = last_px
             if live_quote.get("volume", 0) > 0:
                 df.iloc[-1, df.columns.get_loc("Volume")] = float(live_quote["volume"])
-            data_src = "Canlı TradingView"
+            data_src = str(live_quote.get("source") or "Canlı TradingView")
         else:
             last_px = float(df["Close"].iloc[-1])
             prev_c = float(df["Close"].iloc[-2]) if len(df) > 1 else last_px
@@ -1928,6 +2015,7 @@ def load_universe_snapshots(use_live_tv: bool = False) -> Tuple[Dict[str, AssetS
     fetcher = MultiAssetDataFetcher()
     tv_bist = fetcher.fetch_tradingview_live_quotes("turkey", limit=550) if use_live_tv else {}
     tv_us = fetcher.fetch_tradingview_live_quotes("america", limit=200) if use_live_tv else {}
+    tefas_live = fetcher.fetch_tefas_live_quotes() if use_live_tv else {}
 
     snapshots: Dict[str, AssetSnapshot] = {}
     existing_syms = set()
@@ -1935,8 +2023,40 @@ def load_universe_snapshots(use_live_tv: bool = False) -> Tuple[Dict[str, AssetS
     for item in UNIVERSAL_CATALOG:
         sym = item["symbol"]
         existing_syms.add(sym)
-        lq = tv_bist.get(sym) if item["asset_class"] == "BIST_STOCK" else tv_us.get(sym)
-        snapshots[sym] = fetcher.build_snapshot(item, days=120, live_quote=lq)
+        item_copy = dict(item)
+        if item_copy["asset_class"] == "TEFAS_FUND":
+            lq = tefas_live.get(sym)
+            if lq:
+                item_copy["name"] = lq["name"]
+                item_copy["category"] = lq["category"]
+                item_copy["is_katilim"] = lq["is_katilim"]
+                item_copy["sector"] = "TEFAS Katılım" if lq["is_katilim"] else "TEFAS Konvansiyonel"
+                item_copy["katilim_bucket"] = "TEFAS_KATILIM" if lq["is_katilim"] else "NONE"
+                item_copy["risk_level"] = lq["risk_level"]
+        elif item_copy["asset_class"] == "BIST_STOCK":
+            lq = tv_bist.get(sym)
+        else:
+            lq = tv_us.get(sym)
+        snapshots[sym] = fetcher.build_snapshot(item_copy, days=120, live_quote=lq)
+
+    # Also add any additional real TEFAS funds from live TEFAS API beyond built-in catalog
+    if tefas_live:
+        for sym, lq in tefas_live.items():
+            if sym not in existing_syms and len(sym) == 3 and sym.isalnum():
+                existing_syms.add(sym)
+                extra_f = {
+                    "symbol": sym, "name": lq["name"], "asset_class": "TEFAS_FUND",
+                    "market_group": "TEFAS Fonları",
+                    "sector": "TEFAS Katılım" if lq["is_katilim"] else "TEFAS Konvansiyonel",
+                    "category": lq["category"],
+                    "indices": ["TEFAS_ALL"] + (["TEFAS_KATILIM"] if lq["is_katilim"] else []),
+                    "currency": "TRY", "risk_level": lq["risk_level"],
+                    "is_katilim": lq["is_katilim"],
+                    "katilim_bucket": "TEFAS_KATILIM" if lq["is_katilim"] else "NONE",
+                    "base_price": lq["close"], "pe_ratio": None, "pb_ratio": None,
+                    "roe_pct": None, "ter_pct": 1.65, "yahoo_symbol": None,
+                }
+                snapshots[sym] = fetcher.build_snapshot(extra_f, days=120, live_quote=lq)
 
     # Append additional live TradingView BIST stocks beyond built-in 424 when live scan is active
     extra_count = 0
@@ -1965,7 +2085,7 @@ def load_universe_snapshots(use_live_tv: bool = False) -> Tuple[Dict[str, AssetS
                 snapshots[sym] = fetcher.build_snapshot(extra_item, days=120, live_quote=lq)
                 extra_count += 1
 
-    return snapshots, len(tv_bist) + len(tv_us)
+    return snapshots, len(tv_bist) + len(tv_us) + len(tefas_live)
 
 
 # =============================================================================
@@ -3853,13 +3973,12 @@ def main() -> None:
             st.info("Seçili filtrelere uygun varlık bulunamadı.")
 
     # =========================================================================
-    # WORKSPACE 3: PORTFÖYÜM (KİŞİSEL TAKİP + PROFESYONEL BORSACI DANIŞMANI)
+    # WORKSPACE 3: PORTFÖYÜM (CANLI MALİYET/K-Z + PREMIUM TABLO + BORSACI KOÇU)
     # =========================================================================
     else:
         usdtry_snap = snapshots.get("USDTRY=X")
         usdtry_rate = float(usdtry_snap.last_price) if usdtry_snap else 34.55
 
-        # Ensure every basket symbol has a holding entry
         holdings = dict(st.session_state.get("portfolio_holdings", {}))
         for sym in list(st.session_state.basket):
             if sym in snapshots and sym not in holdings:
@@ -3867,42 +3986,77 @@ def main() -> None:
                 holdings[sym] = {"qty": max(1.0, round(25_000.0 / max(px, 1.0), 0)), "avg_cost": px, "custom_sl": 0.0, "custom_tp": 0.0}
         st.session_state.portfolio_holdings = holdings
 
-        # Top Action Header (+ Pozisyon Ekle / Güncelle Popover)
-        ph_l, ph_r = st.columns([3.8, 1.4])
+        # Top Header + Reactive Add/Edit Position Popover (NO st.form bug!)
+        ph_l, ph_r = st.columns([3.6, 1.5])
         with ph_l:
-            render_html("<div class='aq-h2' style='font-size:18px; margin-bottom:2px;'>Portföyüm & Borsa Danışmanı <span class='aq-h2-sub'>Canlı kâr/zarar, iz süren stop-loss ve masa tavsiyeleri</span></div>")
+            render_html("<div class='aq-h2' style='font-size:18px; margin-bottom:2px;'>Portföyüm & Borsa Danışmanı <span class='aq-h2-sub'>Gerçek maliyet, canlı K/Z ve profesyonel masa yönlendirmeleri</span></div>")
         with ph_r:
             with safe_popover("+ Pozisyon Ekle / Düzenle", use_container_width=True):
                 all_syms = sorted(snapshots.keys())
-                with st.form("v71_add_holding_form", clear_on_submit=False):
-                    p_sym = st.selectbox(
-                        "Varlık Seç",
-                        options=all_syms,
-                        index=all_syms.index("THYAO") if "THYAO" in all_syms else 0,
-                        format_func=lambda s: f"{s} — {snapshots[s].name[:26]} ({snapshots[s].last_price:,.2f} {snapshots[s].currency})",
-                    )
-                    cur_h = holdings.get(p_sym, {})
-                    def_px = float(cur_h.get("avg_cost") or snapshots[p_sym].last_price)
-                    def_qty = float(cur_h.get("qty") or max(1.0, round(25_000.0 / max(def_px, 1.0), 0)))
-                    c_q, c_c = st.columns(2)
-                    in_qty = c_q.number_input("Adet / Lot", min_value=0.01, max_value=10_000_000.0, value=def_qty, step=1.0)
-                    in_cost = c_c.number_input("Ort. Maliyet", min_value=0.0001, max_value=10_000_000.0, value=def_px, format="%.2f")
-                    c_sl, c_tp = st.columns(2)
-                    in_sl = c_sl.number_input("Özel Stop-Loss (0=Oto)", min_value=0.0, max_value=10_000_000.0, value=float(cur_h.get("custom_sl", 0.0)), format="%.2f")
-                    in_tp = c_tp.number_input("Hedef Fiyat TP (0=Oto)", min_value=0.0, max_value=10_000_000.0, value=float(cur_h.get("custom_tp", 0.0)), format="%.2f")
-                    if st.form_submit_button("Portföye Kaydet", type="primary", use_container_width=True):
-                        holdings[p_sym] = {"qty": float(in_qty), "avg_cost": float(in_cost), "custom_sl": float(in_sl), "custom_tp": float(in_tp)}
-                        st.session_state.portfolio_holdings = holdings
-                        if p_sym not in st.session_state.basket:
-                            st.session_state.basket = list(st.session_state.basket) + [p_sym]
-                        st.success(f"{p_sym} portföyünüze kaydedildi.")
-                        st.rerun()
+                p_sym = st.selectbox(
+                    "Varlık Seç",
+                    options=all_syms,
+                    index=all_syms.index("KPU") if "KPU" in all_syms else 0,
+                    format_func=lambda s: f"{s} — {snapshots[s].name[:30]}",
+                    key="pf_editor_symbol",
+                )
+                sel_snap_ed = snapshots[p_sym]
+                cur_h = holdings.get(p_sym, {})
+                live_px_ed = float(sel_snap_ed.last_price)
+                def_cost = float(cur_h["avg_cost"]) if "avg_cost" in cur_h else live_px_ed
+                def_qty = float(cur_h["qty"]) if "qty" in cur_h else max(1.0, round(10_000.0 / max(live_px_ed, 0.1), 0))
+                def_sl = float(cur_h.get("custom_sl", 0.0))
+                def_tp = float(cur_h.get("custom_tp", 0.0))
+
+                st.caption(
+                    f"**{sel_snap_ed.name}** · Kategori: `{sel_snap_ed.category}` · "
+                    f"Güncel Fiyat: **{live_px_ed:,.4f} {sel_snap_ed.currency}** ({sel_snap_ed.data_source})"
+                )
+
+                c_q, c_c = st.columns(2)
+                in_qty = c_q.number_input(
+                    "Adet / Lot", min_value=0.01, max_value=100_000_000.0,
+                    value=def_qty, step=1.0, key=f"pf_qty_{p_sym}",
+                )
+                in_cost = c_c.number_input(
+                    f"Ort. Maliyet ({sel_snap_ed.currency})", min_value=0.0001, max_value=10_000_000.0,
+                    value=def_cost, step=0.05, format="%.4f", key=f"pf_cost_{p_sym}",
+                )
+                c_sl, c_tp = st.columns(2)
+                in_sl = c_sl.number_input(
+                    "Özel Stop-Loss (0=Oto)", min_value=0.0, max_value=10_000_000.0,
+                    value=def_sl, step=0.05, format="%.2f", key=f"pf_sl_{p_sym}",
+                )
+                in_tp = c_tp.number_input(
+                    "Hedef Fiyat TP (0=Oto)", min_value=0.0, max_value=10_000_000.0,
+                    value=def_tp, step=0.05, format="%.2f", key=f"pf_tp_{p_sym}",
+                )
+
+                # Instant Live Cost vs Current Price Preview!
+                est_pnl_pct = ((live_px_ed - float(in_cost)) / max(float(in_cost), 1e-9)) * 100.0
+                est_val = float(in_qty) * live_px_ed
+                st.caption(
+                    f"Önizleme — Maliyetin: **{float(in_cost):,.4f}** | Güncel: **{live_px_ed:,.4f}** | "
+                    f"Anlık K/Z: **{est_pnl_pct:+.2f}%** | Değer: **{est_val:,.0f} {sel_snap_ed.currency}**"
+                )
+
+                if st.button("Portföye Kaydet", type="primary", use_container_width=True, key=f"pf_save_{p_sym}"):
+                    holdings[p_sym] = {
+                        "qty": float(in_qty),
+                        "avg_cost": float(in_cost),
+                        "custom_sl": float(in_sl),
+                        "custom_tp": float(in_tp),
+                    }
+                    st.session_state.portfolio_holdings = holdings
+                    if p_sym not in st.session_state.basket:
+                        st.session_state.basket = list(st.session_state.basket) + [p_sym]
+                    st.success(f"{p_sym} ({float(in_qty):,.0f} adet @ {float(in_cost):,.4f}) kaydedildi.")
+                    st.rerun()
 
         active_syms = [s for s in st.session_state.basket if s in snapshots and s in holdings]
         if not active_syms:
-            st.info("Portföyünüzde henüz takip edilen varlık yok. Sağ üstteki '+ Pozisyon Ekle / Düzenle' butonundan veya herhangi bir varlık sayfasından '+ Portföye Ekle' ile başlayabilirsiniz.")
+            st.info("Portföyünüzde henüz takip edilen varlık yok. Sağ üstteki '+ Pozisyon Ekle / Düzenle' butonundan ekleyebilirsiniz.")
         else:
-            # First pass: compute total value in TL
             total_val_tl = 0.0
             total_cost_tl = 0.0
             for s in active_syms:
@@ -3929,7 +4083,6 @@ def main() -> None:
             pnl_col = "#10B981" if tot_pnl_tl >= 0 else "#EF4444"
             day_col = "#10B981" if tot_day_tl >= 0 else "#EF4444"
 
-            # 4-Card Calm Portfolio KPI Strip
             render_html(
                 f"""
                 <div class="aq-ticker-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top:10px; margin-bottom:18px;">
@@ -3957,71 +4110,97 @@ def main() -> None:
                 """
             )
 
-            # 3 Clean Internal Sub-Tabs inside Portföyüm
             pt_pos, pt_bt, pt_rep = st.tabs(["Pozisyonlar & Borsacı Tavsiyeleri", "Portföy Backtesti", "PDF & E-Posta Raporu"])
 
             with pt_pos:
-                col_tbl, col_coach = st.columns([1.42, 1.0], gap="large")
-
-                with col_tbl:
-                    render_html("<div class='aq-h2'>Pozisyon Takibi <span class='aq-h2-sub'>Detayını açmak için satıra tıklayın</span></div>")
-                    pos_df = pd.DataFrame([
-                        {
-                            "Sembol": p["symbol"],
-                            "Adet": round(p["qty"], 2),
-                            "Maliyet": round(p["avg_cost"], 2),
-                            "Fiyat": p["last_price"],
-                            "Birim": p["currency"],
-                            "Değer (TL)": round(p["val_tl"], 0),
-                            "Günlük %": p["pnl_pct"],
-                            "Ağırlık %": round(p["weight_pct"], 1),
-                            "Stop-Loss": p["eff_sl"],
-                            "Hedef TP": p["eff_tp"],
-                            "Masa Tavsiyesi": p["action_tag"],
-                        }
-                        for p in pos_list
-                    ])
-                    # Rename Günlük % column label cleanly to K/Z % for clarity
-                    pos_df = pos_df.rename(columns={"Günlük %": "K/Z %"})
-                    col_cfg_p = {}
-                    if hasattr(st, "column_config"):
-                        cc = st.column_config
-                        if hasattr(cc, "NumberColumn"):
-                            col_cfg_p["Değer (TL)"] = cc.NumberColumn("Değer (TL)", format="%,.0f ₺")
-                            col_cfg_p["K/Z %"] = cc.NumberColumn("K/Z %", format="%+.2f%%")
-                            col_cfg_p["Ağırlık %"] = cc.NumberColumn("Ağırlık", format="%.1f%%")
-                    try:
-                        ev = st.dataframe(
-                            pos_df, use_container_width=True, hide_index=True, height=300,
-                            column_config=col_cfg_p or None, on_select="rerun", selection_mode="single-row",
-                        )
-                        sel_r = getattr(getattr(ev, "selection", None), "rows", None)
-                        if sel_r:
-                            open_detail(pos_list[int(sel_r[0])]["symbol"])
-                            st.rerun()
-                    except TypeError:
-                        st.dataframe(pos_df, use_container_width=True, hide_index=True, height=300, column_config=col_cfg_p or None)
-
-                    # Compact Position Management Strip (Quick Remove)
-                    rm_c1, rm_c2 = st.columns([2.4, 1.1])
-                    rm_target = rm_c1.selectbox(
-                        "Pozisyon Kaldır", options=[p["symbol"] for p in pos_list],
-                        format_func=lambda s: f"{s} ({holdings[s]['qty']:,.0f} adet)",
-                        label_visibility="collapsed",
+                # PREMIUM CUSTOM STYLED INSTITUTIONAL HOLDINGS TABLE (Full-Width, Zero Raw DataFrame Clutter!)
+                render_html("<div class='aq-h2'>Varlıklarım <span class='aq-h2-sub'>Maliyet, canlı fiyat, kâr/zarar ve dinamik stop seviyeleri</span></div>")
+                row_html_list = []
+                for p in pos_list:
+                    dec = 4 if (p["last_price"] < 10 or p["avg_cost"] < 10) else 2
+                    pnl_pill_bg = "rgba(16,185,129,0.14)" if p["pnl_tl"] >= 0 else "rgba(239,68,68,0.14)"
+                    pnl_pill_fg = "#34D399" if p["pnl_tl"] >= 0 else "#FCA5A5"
+                    kat_dot = "<span style='color:#34D399; font-size:10px; margin-left:5px;'>● Katılım</span>" if p["is_katilim"] else ""
+                    bar_w = min(100.0, max(4.0, p["weight_pct"]))
+                    row_html_list.append(
+                        f"<tr style='border-bottom:1px solid rgba(148,163,184,0.10);'>"
+                        f"<td style='padding:14px 16px;'>"
+                        f"<div style='font-size:14.5px; font-weight:700; color:#F8FAFC;'>{html.escape(p['symbol'])}{kat_dot}</div>"
+                        f"<div style='font-size:11.5px; color:#64748B; margin-top:2px;'>{html.escape(p['name'][:38])} · {html.escape(p['snap'].category)}</div>"
+                        f"</td>"
+                        f"<td style='padding:14px 12px; font-family:JetBrains Mono,monospace;'>"
+                        f"<div style='font-size:13.5px; font-weight:600; color:#E2E8F0;'>{p['avg_cost']:,.{dec}f} {p['currency']}</div>"
+                        f"<div style='font-size:11px; color:#64748B; margin-top:2px;'>{p['qty']:,.2f} adet</div>"
+                        f"</td>"
+                        f"<td style='padding:14px 12px; font-family:JetBrains Mono,monospace;'>"
+                        f"<div style='font-size:14px; font-weight:700; color:#F8FAFC;'>{p['last_price']:,.{dec}f} {p['currency']}</div>"
+                        f"<div style='font-size:11px; color:{'#10B981' if p['snap'].change_pct >= 0 else '#EF4444'}; margin-top:2px;'>Günlük {p['snap'].change_pct:+.2f}%</div>"
+                        f"</td>"
+                        f"<td style='padding:14px 12px;'>"
+                        f"<span style='display:inline-block; background:{pnl_pill_bg}; color:{pnl_pill_fg}; padding:4px 10px; border-radius:8px; font-family:JetBrains Mono,monospace; font-size:12.5px; font-weight:600;'>"
+                        f"{p['pnl_tl']:+,.0f} ₺ ({p['pnl_pct']:+.2f}%)</span>"
+                        f"</td>"
+                        f"<td style='padding:14px 12px; font-family:JetBrains Mono,monospace;'>"
+                        f"<div style='font-size:13.5px; font-weight:600; color:#F1F5F9;'>{p['val_tl']:,.0f} ₺ <span style='font-size:11px; color:#64748B;'>(%{p['weight_pct']:.1f})</span></div>"
+                        f"<div style='height:4px; width:92px; background:#1E293B; border-radius:99px; margin-top:6px; overflow:hidden;'>"
+                        f"<div style='height:100%; width:{bar_w:.0f}%; background:#3B82F6; border-radius:99px;'></div></div>"
+                        f"</td>"
+                        f"<td style='padding:14px 12px; font-family:JetBrains Mono,monospace; font-size:12px;'>"
+                        f"<div style='color:#FCA5A5;'>SL: {p['eff_sl']:,.{dec}f}</div>"
+                        f"<div style='color:#6EE7B7; margin-top:2px;'>TP: {p['eff_tp']:,.{dec}f}</div>"
+                        f"</td>"
+                        f"<td style='padding:14px 16px; text-align:right;'>"
+                        f"<span class='{p['badge_cls']}'>{html.escape(p['action_tag'])}</span>"
+                        f"</td>"
+                        f"</tr>"
                     )
-                    if rm_c2.button("Pozisyonu Çıkar", use_container_width=True):
-                        toggle_basket(rm_target)
-                        st.rerun()
 
-                    # Allocation Donut Chart
-                    render_html("<div class='aq-h2' style='margin-top:14px;'>Varlık Dağılımı</div>")
-                    st.plotly_chart(build_portfolio_donut(pos_list, height=230), use_container_width=True, key="v71_donut")
+                render_html(
+                    f"""
+                    <div style="background:#111622; border:1px solid rgba(148,163,184,0.14); border-radius:14px; overflow-x:auto; margin-bottom:14px;">
+                        <table style="width:100%; border-collapse:collapse; text-align:left;">
+                            <thead>
+                                <tr style="background:#151C2C; border-bottom:1px solid rgba(148,163,184,0.14); color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.04em;">
+                                    <th style="padding:11px 16px;">Varlık</th>
+                                    <th style="padding:11px 12px;">Ort. Maliyet / Adet</th>
+                                    <th style="padding:11px 12px;">Güncel Fiyat</th>
+                                    <th style="padding:11px 12px;">Kâr / Zarar</th>
+                                    <th style="padding:11px 12px;">Değer & Ağırlık</th>
+                                    <th style="padding:11px 12px;">Stop / Hedef</th>
+                                    <th style="padding:11px 16px; text-align:right;">Masa Tavsiyesi</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(row_html_list)}</tbody>
+                        </table>
+                    </div>
+                    """
+                )
 
-                with col_coach:
+                # Clean Quick Action Bar for Positions
+                qa1, qa2, qa3 = st.columns([2.6, 1.1, 1.0], gap="small")
+                selected_pos_sym = qa1.selectbox(
+                    "Pozisyon İşlemi",
+                    options=[p["symbol"] for p in pos_list],
+                    format_func=lambda s: f"{s} — {snapshots[s].name[:32]} ({holdings[s]['qty']:,.0f} adet @ {holdings[s]['avg_cost']:,.2f})",
+                    label_visibility="collapsed",
+                )
+                if qa2.button("Detaylı Grafiği Aç →", type="primary", use_container_width=True):
+                    open_detail(selected_pos_sym)
+                    st.rerun()
+                if qa3.button("Portföyden Çıkar", use_container_width=True):
+                    toggle_basket(selected_pos_sym)
+                    st.rerun()
+
+                render_html("<div style='height:14px;'></div>")
+
+                # Below Table: 2-Column Pro Desk Coaching Cards + Allocation Donut
+                c_coach, c_donut = st.columns([1.55, 1.0], gap="large")
+                with c_coach:
                     render_html("<div class='aq-h2'>Profesyonel Masa Yönlendirmeleri <span class='aq-h2-sub'>Öncelik sırasına göre</span></div>")
                     coached = sorted(pos_list, key=lambda x: x["priority"])
                     for idx_c, p in enumerate(coached):
                         p_col = "#10B981" if p["pnl_pct"] >= 0 else "#EF4444"
+                        dec = 4 if p["last_price"] < 10 else 2
                         render_html(
                             f"""
                             <div class="aq-news-item">
@@ -4030,22 +4209,23 @@ def main() -> None:
                                         <span class="aq-sym">{html.escape(p['symbol'])}</span>
                                         <span class="{p['badge_cls']}" style="margin-left:6px;">{html.escape(p['action_tag'])}</span>
                                     </div>
-                                    <span class="aq-mono" style="font-size:12.5px; color:{p_col}; font-weight:600;">{p['pnl_pct']:+.1f}% ({p['pnl_tl']:+,.0f} ₺)</span>
+                                    <span class="aq-mono" style="font-size:12.5px; color:{p_col}; font-weight:600;">{p['pnl_pct']:+.2f}% ({p['pnl_tl']:+,.0f} ₺)</span>
                                 </div>
                                 <div style="font-size:12.5px; color:#CBD5E1; line-height:1.55; margin-top:8px;">
                                     {html.escape(p['advice'])}
                                 </div>
                                 <div class="aq-row-between" style="margin-top:9px; padding-top:8px; border-top:1px solid rgba(148,163,184,0.10); font-size:11.5px; color:#94A3B8; font-family:'JetBrains Mono',monospace;">
-                                    <span>Stop: <b style="color:#FCA5A5;">{p['eff_sl']:,.2f}</b> (-%{max(p['dist_sl_pct'], 0):.1f})</span>
-                                    <span>Hedef: <b style="color:#6EE7B7;">{p['eff_tp']:,.2f}</b> (+%{max(p['dist_tp_pct'], 0):.1f})</span>
-                                    <span>Ağırlık: %{p['weight_pct']:.1f}</span>
+                                    <span>Maliyet: {p['avg_cost']:,.{dec}f} → Güncel: {p['last_price']:,.{dec}f}</span>
+                                    <span>Stop: <b style="color:#FCA5A5;">{p['eff_sl']:,.{dec}f}</b> · TP: <b style="color:#6EE7B7;">{p['eff_tp']:,.{dec}f}</b></span>
                                 </div>
                             </div>
                             """
                         )
-                        if st.button(f"{p['symbol']} Grafiğini İncele →", key=f"coach_go_{idx_c}_{p['symbol']}", use_container_width=True):
-                            open_detail(p["symbol"])
-                            st.rerun()
+
+                with c_donut:
+                    render_html("<div class='aq-h2'>Portföy Dağılımı</div>")
+                    st.plotly_chart(build_portfolio_donut(pos_list, height=260), use_container_width=True, key="v72_donut")
+                    st.caption("Maliyet veya lot güncellemek için sağ üstteki '+ Pozisyon Ekle / Düzenle' butonunu kullanabilirsiniz.")
 
             with pt_bt:
                 basket_snaps = [p["snap"] for p in pos_list]
@@ -4055,7 +4235,7 @@ def main() -> None:
                 m2.metric("Al & Tut", f"%{bt_res['bh_ret_pct']:+.2f}")
                 m3.metric("Maks. Düşüş", f"%{bt_res['max_dd_pct']:.2f}")
                 m4.metric("Sharpe Oranı", f"{bt_res['sharpe']:.2f}")
-                st.plotly_chart(build_backtest_chart(bt_res, height=340, label="Portföyüm (AlpQuant Strateji)"), use_container_width=True, key="v71_port_bt")
+                st.plotly_chart(build_backtest_chart(bt_res, height=340, label="Portföyüm (AlpQuant Strateji)"), use_container_width=True, key="v72_port_bt")
 
             with pt_rep:
                 export_sigs = [p["sig"] for p in pos_list]
