@@ -100,7 +100,7 @@ def safe_popover(label: str, use_container_width: bool = True):
 # =============================================================================
 @dataclass
 class SuitabilityProfile:
-    user_id: str = "alperen_gulluoglu"
+    user_id: str = ""
     risk_score: int = 5
     risk_label: str = "Çok Yüksek Risk (Agresif / Profesyonel)"
     approved_levels: List[int] = field(default_factory=lambda: [1, 2, 3, 4, 5])
