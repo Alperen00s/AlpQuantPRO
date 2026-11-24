@@ -3083,7 +3083,7 @@ def init_session_state() -> None:
         "gemini_api_key": os.environ.get("GEMINI_API_KEY", ""),
         "smtp_user": "",
         "smtp_pass": "",
-        "email_recipient": "alperengulluoglu@gmail.com",
+        "email_recipient": "",
         "search_query": "",
         "market_group": "Tüm Piyasalar (1,100+)",
         "katilim_mode": "Tümü (Konv. + Katılım)",
