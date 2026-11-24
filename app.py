@@ -50,7 +50,7 @@ except Exception:
 # 1. PAGE CONFIG & TURKISH NORMALIZATION HELPERS
 # =============================================================================
 st.set_page_config(
-    page_title="AlpQuant Pro v7.2 | Kurumsal Yatırım Platformu",
+    page_title="AlpQuant Pro v7.3 | Kurumsal Yatırım Platformu",
     page_icon="◈",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -752,9 +752,11 @@ def _build_full_universe_catalog() -> List[Dict[str, Any]]:
         ("KGM", "Kuveyt Türk Portföy Gümüş Katılım Fonu", "Kıymetli Maden / Gümüş", 4, 4.85, 1.65),
         ("KLU", "Kuveyt Türk Portföy Para Piyasası Katılım Fonu", "Katılım Para Piyasası", 1, 2.48, 0.95),
         ("KIS", "Kuveyt Türk Portföy Sürdürülebilirlik Katılım Fonu", "Katılım Hisse Senedi", 4, 3.12, 2.05),
-        ("KTT", "Kuveyt Türk Portföy Teknoloji Katılım Fonu", "Katılım Teknoloji", 4, 2.94, 2.25),
+        ("KTJ", "Kuveyt Türk Portföy Teknoloji Katılım Fonu", "Katılım Teknoloji", 4, 2.94, 2.25),
+        ("KCV", "Kuveyt Türk Portföy Çoklu Varlık Katılım Fonu", "Katılım Değişken", 3, 3.85, 1.85),
+        ("KNJ", "Kuveyt Türk Portföy Enerji Katılım Fonu", "Katılım Hisse Senedi", 4, 2.65, 2.10),
         ("KPU", "Kuveyt Türk Portföy İkinci Katılım Hisse Senedi (TL) Fonu", "Katılım Hisse Senedi", 4, 3.28, 2.05),
-        ("KTN", "Kuveyt Türk Portföy Birinci Katılım Fonu", "Katılım Değişken", 3, 4.18, 1.80),
+        ("KTN", "Kuveyt Türk Portföy Kira Sertifikaları Katılım (TL) Fonu", "Kira Sertifikası (Sukuk)", 2, 4.18, 1.40),
         ("KUT", "Kuveyt Türk Portföy Kıymetli Madenler Katılım Fonu", "Kıymetli Maden / Altın", 3, 6.42, 1.60),
         ("MPS", "Mükafat Portföy Katılım Hisse Senedi Fonu", "Katılım Hisse Senedi", 4, 12.85, 2.15),
         ("MPK", "Mükafat Portföy Kısa Vadeli Kira Sertifikası Katılım Fonu", "Kira Sertifikası (Sukuk)", 1, 4.12, 1.10),
@@ -1523,7 +1525,7 @@ def _extend_universe_catalog(catalog: List[Dict[str, Any]]) -> List[Dict[str, An
 
     extra_tefas = [
         ("IHK", "İş Portföy BIST Katılım 100 Endeksi Hisse Fonu", "Katılım Hisse Senedi", True, 4, 8.45, 1.95),
-        ("KPC", "Kuveyt Türk Portföy Katılım Hisse Senedi (TL) Fonu", "Katılım Hisse Senedi", True, 4, 8.95, 2.05),
+        ("KPC", "Kuveyt Türk Portföy Katılım Hisse Senedi (TL) Fonu", "Katılım Hisse Senedi", True, 4, 18.52, 2.40),
         ("KSV", "Kuveyt Türk Portföy Katılım Serbest Fon", "Katılım Değişken", True, 4, 5.42, 1.90),
         ("KAV", "Kuveyt Türk Portföy Agresif Katılım Fonu", "Katılım Değişken", True, 5, 4.95, 2.15),
         ("KRF", "Kuveyt Türk Portföy Kira Sertifikası Döviz Fonu", "Katılım Döviz / Eurobond", True, 3, 4.32, 1.40),
@@ -1802,32 +1804,41 @@ class MultiAssetDataFetcher:
 
     @classmethod
     def fetch_tefas_live_quotes(cls) -> Dict[str, Dict[str, Any]]:
-        """Fetches real official fund titles & daily NAV prices directly from TEFAS."""
+        """Fetches real official fund titles & daily NAV prices from TEFAS using a cookie-enabled session."""
         try:
+            import http.cookiejar
+            cj = http.cookiejar.CookieJar()
+            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+            ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            # Step 1: Visit main page to obtain ASP.NET session cookies
+            init_req = urllib.request.Request("https://www.tefas.gov.tr/TarihselVeriler.aspx", headers={"User-Agent": ua})
+            try:
+                with opener.open(init_req, timeout=3):
+                    pass
+            except Exception:
+                pass
+
             end_dt = datetime.now(timezone.utc)
             start_dt = end_dt - timedelta(days=7)
             form_data = urllib.parse.urlencode({
-                "fontip": "YAT",
-                "sfontur": "",
-                "fonkod": "",
-                "fongrup": "",
+                "fontip": "YAT", "sfontur": "", "fonkod": "", "fongrup": "",
                 "bastarih": start_dt.strftime("%d.%m.%Y"),
                 "bittarih": end_dt.strftime("%d.%m.%Y"),
-                "fonturkod": "",
-                "fonunvantip": "",
+                "fonturkod": "", "fonunvantip": "",
             }).encode("utf-8")
             req = urllib.request.Request(
                 cls.TEFAS_API_URL,
                 data=form_data,
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                    "User-Agent": "Mozilla/5.0",
+                    "User-Agent": ua,
                     "Referer": "https://www.tefas.gov.tr/TarihselVeriler.aspx",
+                    "Origin": "https://www.tefas.gov.tr",
                     "X-Requested-With": "XMLHttpRequest",
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=4) as resp:
+            with opener.open(req, timeout=5) as resp:
                 raw = json.loads(resp.read().decode("utf-8"))
             rows = raw.get("data", [])
             if not rows:
@@ -1850,18 +1861,72 @@ class MultiAssetDataFetcher:
                 title = pts[-1][2]
                 cat, is_kat, rl = cls._infer_tefas_category(title)
                 out[code] = {
-                    "name": title,
-                    "close": round(last_px, 6 if last_px < 1 else 4),
-                    "change_pct": round(chg, 2),
-                    "category": cat,
-                    "is_katilim": is_kat,
-                    "risk_level": rl,
-                    "source": "Canlı TEFAS",
+                    "name": title, "close": round(last_px, 6 if last_px < 1 else 4),
+                    "change_pct": round(chg, 2), "category": cat,
+                    "is_katilim": is_kat, "risk_level": rl, "source": "Canlı TEFAS",
                 }
             return out
         except Exception:
             return {}
 
+    @classmethod
+    def fetch_single_tefas_live(cls, code: str) -> Optional[Dict[str, Any]]:
+        """
+        Multi-source live TEFAS fallback for single funds (works even when tefas.gov.tr geo-blocks cloud IPs).
+        Checks FVT, Yatirimci.ai, and Fonoloji server-rendered pages for exact daily NAV & official title.
+        """
+        c = code.strip().upper()
+        ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+        sources = [
+            ("Canlı TEFAS (FVT)", f"https://fvt.com.tr/fonlar/yatirim-fonlari/{c}"),
+            ("Canlı TEFAS (Yatırımcı)", f"https://yatirimci.ai/fon/yatirim-fonlari/{c.lower()}"),
+            ("Canlı TEFAS (Fonoloji)", f"https://fonoloji.com/fon/{c}"),
+        ]
+        price_patterns = [
+            r"son\s+pay\s+fiyat[ıi]\s*(?:₺|TL)?\s*([0-9]{1,5}[.,][0-9]{2,6})",
+            r"son\s+fiyat[ıi][^0-9]{0,35}([0-9]{1,5}[.,][0-9]{2,6})\s*(?:TL|₺)",
+            r"fiyat[ıi]?\s*[:\-]?\s*₺\s*([0-9]{1,5}[.,][0-9]{2,6})",
+            r"([0-9]{1,5},[0-9]{2,6})\s*(?:TL|₺)",
+        ]
+        for src_label, url in sources:
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": ua, "Accept-Language": "tr-TR,tr;q=0.9"})
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    body = resp.read().decode("utf-8", errors="ignore")
+                found_px = None
+                for pat in price_patterns:
+                    m = re.search(pat, body, flags=re.IGNORECASE)
+                    if m:
+                        raw_num = m.group(1).replace(".", "").replace(",", ".") if ("," in m.group(1) and "." in m.group(1)) else m.group(1).replace(",", ".")
+                        val = float(raw_num)
+                        if 0.001 < val < 50000:
+                            found_px = val
+                            break
+                if found_px is not None:
+                    # Extract official title from <title> or <h1> if clean
+                    title_m = re.search(r"<h1[^>]*>(.*?)</h1>", body, flags=re.IGNORECASE | re.DOTALL)
+                    clean_title = re.sub(r"<[^>]+>", "", title_m.group(1)).strip() if title_m else ""
+                    chg_m = re.search(r"günlük\s+(?:değişim|getiri)[^0-9+\-−]{0,20}([+\-−]?%?\s*[0-9]+[.,][0-9]+)", body, flags=re.IGNORECASE)
+                    chg_val = None
+                    if chg_m:
+                        c_str = chg_m.group(1).replace("−", "-").replace("%", "").replace(",", ".").strip()
+                        try:
+                            chg_val = float(c_str)
+                        except Exception:
+                            chg_val = None
+                    out: Dict[str, Any] = {"close": round(found_px, 4), "source": src_label}
+                    if chg_val is not None:
+                        out["change_pct"] = round(chg_val, 2)
+                    if clean_title and len(clean_title) > 10 and "404" not in clean_title:
+                        out["name"] = clean_title[:90]
+                        cat, is_kat, rl = cls._infer_tefas_category(clean_title)
+                        out["category"] = cat
+                        out["is_katilim"] = is_kat
+                        out["risk_level"] = rl
+                    return out
+            except Exception:
+                continue
+        return None
 
     @staticmethod
     def generate_synthetic_ohlcv(
@@ -1876,7 +1941,6 @@ class MultiAssetDataFetcher:
         mu = drift_map.get(risk_level, 0.0006)
 
         rets = rng.normal(mu, sigma, size=days)
-        # Add mild mean-reverting cyclical wave for realistic chart shapes
         t = np.linspace(0, 3.2 * np.pi, days)
         wave = 0.0025 * np.sin(t + (seed % 7))
         path = np.cumprod(1.0 + rets + wave)
@@ -2010,7 +2074,7 @@ class MultiAssetDataFetcher:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def load_universe_snapshots(use_live_tv: bool = False) -> Tuple[Dict[str, AssetSnapshot], int]:
+def load_universe_snapshots(use_live_tv: bool = False, _cache_v: str = "v73") -> Tuple[Dict[str, AssetSnapshot], int]:
     """Builds and caches all 840+ AssetSnapshots (+ any extra live TradingView BIST tickers)."""
     fetcher = MultiAssetDataFetcher()
     tv_bist = fetcher.fetch_tradingview_live_quotes("turkey", limit=550) if use_live_tv else {}
@@ -2086,6 +2150,60 @@ def load_universe_snapshots(use_live_tv: bool = False) -> Tuple[Dict[str, AssetS
                 extra_count += 1
 
     return snapshots, len(tv_bist) + len(tv_us) + len(tefas_live)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_single_asset_live_quote(symbol: str, asset_class: str, yahoo_symbol: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Fetches a real live price for any focused or portfolio asset (TEFAS multi-source or Yahoo Finance)."""
+    if asset_class == "TEFAS_FUND":
+        return MultiAssetDataFetcher.fetch_single_tefas_live(symbol)
+    if HAS_YFINANCE and yahoo_symbol:
+        try:
+            hist = yf.Ticker(yahoo_symbol).history(period="5d", interval="1d", timeout=4)
+            if hist is not None and not hist.empty:
+                last_px = float(hist["Close"].iloc[-1])
+                prev_px = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else last_px
+                chg = ((last_px - prev_px) / max(prev_px, 1e-9)) * 100.0
+                return {"close": round(last_px, 4 if last_px < 10 else 2), "change_pct": round(chg, 2), "source": "Canlı Yahoo Finance"}
+        except Exception:
+            pass
+    return None
+
+
+def apply_live_quote_to_snapshot(snap: AssetSnapshot, lq: Optional[Dict[str, Any]]) -> AssetSnapshot:
+    """Applies a fetched live quote to an AssetSnapshot in memory without breaking cached objects."""
+    if not lq or not lq.get("close"):
+        return snap
+    new_px = float(lq["close"])
+    old_px = max(float(snap.last_price), 1e-9)
+    scale = new_px / old_px
+    df_scaled = snap.df.copy()
+    for col in ("Open", "High", "Low", "Close"):
+        df_scaled[col] = df_scaled[col] * scale
+    chg = float(lq["change_pct"]) if lq.get("change_pct") is not None else snap.change_pct
+    ind = QuantitativeIndicators.compute_all(df_scaled)
+    return AssetSnapshot(
+        symbol=snap.symbol,
+        name=str(lq.get("name") or snap.name),
+        asset_class=snap.asset_class,
+        market_group=snap.market_group,
+        sector="TEFAS Katılım" if lq.get("is_katilim") else snap.sector,
+        category=str(lq.get("category") or snap.category),
+        indices=snap.indices,
+        currency=snap.currency,
+        risk_level=int(lq.get("risk_level") or snap.risk_level),
+        is_katilim=bool(lq["is_katilim"]) if "is_katilim" in lq else snap.is_katilim,
+        katilim_bucket=snap.katilim_bucket,
+        df=df_scaled,
+        last_price=round(new_px, 4 if new_px < 10 else 2),
+        prev_close=round(new_px / max(1.0 + chg / 100.0, 1e-6), 4 if new_px < 10 else 2),
+        change_pct=round(chg, 2),
+        volume=snap.volume,
+        pe_ratio=snap.pe_ratio, pb_ratio=snap.pb_ratio, roe_pct=snap.roe_pct, ter_pct=snap.ter_pct,
+        data_source=str(lq.get("source") or "Canlı Veri"),
+        yahoo_symbol=snap.yahoo_symbol,
+        indicators=ind,
+    )
+
 
 
 # =============================================================================
@@ -3621,6 +3739,19 @@ def main() -> None:
     snapshots: Dict[str, AssetSnapshot] = dict(base_snapshots)
     snapshots.update(st.session_state.custom_snapshots)
 
+    # Always ensure held portfolio symbols, active detail symbol, and editor symbol have fresh live quotes!
+    if st.session_state.use_live_tv:
+        priority_live_syms = set(st.session_state.basket)
+        if st.session_state.detail_symbol:
+            priority_live_syms.add(st.session_state.detail_symbol)
+        if st.session_state.get("pf_editor_symbol"):
+            priority_live_syms.add(st.session_state["pf_editor_symbol"])
+        for psym in priority_live_syms:
+            if psym in snapshots and not snapshots[psym].data_source.startswith("Canlı"):
+                lq = fetch_single_asset_live_quote(psym, snapshots[psym].asset_class, snapshots[psym].yahoo_symbol)
+                if lq:
+                    snapshots[psym] = apply_live_quote_to_snapshot(snapshots[psym], lq)
+
     all_scored: Dict[str, SignalResult] = {
         sym: AlpQuantDecisionEngine.score_asset(snap, profile, st.session_state.total_capital_tl)
         for sym, snap in snapshots.items()
@@ -4134,7 +4265,7 @@ def main() -> None:
                         f"</td>"
                         f"<td style='padding:14px 12px; font-family:JetBrains Mono,monospace;'>"
                         f"<div style='font-size:14px; font-weight:700; color:#F8FAFC;'>{p['last_price']:,.{dec}f} {p['currency']}</div>"
-                        f"<div style='font-size:11px; color:{'#10B981' if p['snap'].change_pct >= 0 else '#EF4444'}; margin-top:2px;'>Günlük {p['snap'].change_pct:+.2f}%</div>"
+                        f"<div style='font-size:11px; color:{'#10B981' if p['snap'].change_pct >= 0 else '#EF4444'}; margin-top:2px;'>Günlük {p['snap'].change_pct:+.2f}% · <span style='color:#64748B;'>{html.escape(p['snap'].data_source)}</span></div>"
                         f"</td>"
                         f"<td style='padding:14px 12px;'>"
                         f"<span style='display:inline-block; background:{pnl_pill_bg}; color:{pnl_pill_fg}; padding:4px 10px; border-radius:8px; font-family:JetBrains Mono,monospace; font-size:12.5px; font-weight:600;'>"
