@@ -50,7 +50,7 @@ except Exception:
 # 1. PAGE CONFIG & TURKISH NORMALIZATION HELPERS
 # =============================================================================
 st.set_page_config(
-    page_title="AlpQuant Pro v7.0 | Kurumsal Yatırım Platformu",
+    page_title="AlpQuant Pro v7.1 | Kurumsal Yatırım Platformu",
     page_icon="◈",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -100,7 +100,7 @@ def safe_popover(label: str, use_container_width: bool = True):
 # =============================================================================
 @dataclass
 class SuitabilityProfile:
-    user_id: str = ""
+    user_id: str = "alperen_gulluoglu"
     risk_score: int = 5
     risk_label: str = "Çok Yüksek Risk (Agresif / Profesyonel)"
     approved_levels: List[int] = field(default_factory=lambda: [1, 2, 3, 4, 5])
@@ -3073,6 +3073,11 @@ def init_session_state() -> None:
         "detail_symbol": None,          # None = show workspace; "THYAO" = open clean Asset Detail View
         "home_lens": "Tümü",
         "basket": ["THYAO", "ASELS", "KTV"],
+        "portfolio_holdings": {
+            "THYAO": {"qty": 120.0, "avg_cost": 289.0, "custom_sl": 0.0, "custom_tp": 0.0},
+            "ASELS": {"qty": 450.0, "avg_cost": 71.5, "custom_sl": 0.0, "custom_tp": 0.0},
+            "KTV": {"qty": 8000.0, "avg_cost": 5.10, "custom_sl": 0.0, "custom_tp": 0.0},
+        },
         "custom_snapshots": {},
         "screener_preset": "Tümü",
         "suitability_profile": SuitabilityProfile(),
@@ -3083,7 +3088,7 @@ def init_session_state() -> None:
         "gemini_api_key": os.environ.get("GEMINI_API_KEY", ""),
         "smtp_user": "",
         "smtp_pass": "",
-        "email_recipient": "",
+        "email_recipient": "alperengulluoglu@gmail.com",
         "search_query": "",
         "market_group": "Tüm Piyasalar (1,100+)",
         "katilim_mode": "Tümü (Konv. + Katılım)",
@@ -3117,13 +3122,136 @@ def go_workspace(ws: str) -> None:
     st.session_state.detail_symbol = None
 
 
-def toggle_basket(symbol: str) -> None:
+def toggle_basket(symbol: str, default_price: float = 0.0) -> None:
     b = list(st.session_state.basket)
+    holdings = dict(st.session_state.get("portfolio_holdings", {}))
     if symbol in b:
         b.remove(symbol)
+        holdings.pop(symbol, None)
     else:
         b.append(symbol)
+        if symbol not in holdings:
+            px = max(float(default_price), 1.0)
+            est_qty = max(1.0, round(25_000.0 / px, 2 if px > 500 else 0))
+            holdings[symbol] = {"qty": est_qty, "avg_cost": px, "custom_sl": 0.0, "custom_tp": 0.0}
     st.session_state.basket = b
+    st.session_state.portfolio_holdings = holdings
+
+
+def evaluate_portfolio_position(
+    snap: AssetSnapshot,
+    sig: SignalResult,
+    holding: Dict[str, float],
+    total_port_tl: float,
+    usdtry: float = 34.55,
+) -> Dict[str, Any]:
+    """Institutional trader desk coaching engine for a single live portfolio holding."""
+    qty = float(holding.get("qty", 0.0))
+    avg_cost = float(holding.get("avg_cost", snap.last_price)) or snap.last_price
+    fx = usdtry if snap.currency == "USD" else 1.0
+
+    val_tl = qty * snap.last_price * fx
+    cost_tl = qty * avg_cost * fx
+    pnl_tl = val_tl - cost_tl
+    pnl_pct = ((snap.last_price - avg_cost) / max(avg_cost, 1e-9)) * 100.0
+    day_pnl_tl = val_tl * (snap.change_pct / (100.0 + snap.change_pct))
+    weight_pct = (val_tl / max(total_port_tl, 1e-9)) * 100.0
+
+    # Dynamic ATR Trailing Stop-Loss & Take-Profit
+    c_sl = float(holding.get("custom_sl", 0.0) or 0.0)
+    c_tp = float(holding.get("custom_tp", 0.0) or 0.0)
+    dec = 4 if snap.last_price < 10 else 2
+
+    if c_sl > 0:
+        eff_sl = round(c_sl, dec)
+    elif pnl_pct >= 12.0:
+        eff_sl = round(max(sig.stop_loss, avg_cost * 1.04), dec)
+    elif pnl_pct >= 7.0:
+        eff_sl = round(max(sig.stop_loss, avg_cost * 1.01), dec)
+    else:
+        eff_sl = sig.stop_loss
+
+    eff_tp = round(c_tp, dec) if c_tp > 0 else sig.take_profit
+    dist_sl_pct = ((snap.last_price - eff_sl) / max(snap.last_price, 1e-9)) * 100.0
+    dist_tp_pct = ((eff_tp - snap.last_price) / max(snap.last_price, 1e-9)) * 100.0
+
+    # Pro Desk Action & Trader Commentary
+    if snap.last_price <= eff_sl:
+        tag, badge_cls, prio = "STOP-LOSS TETİKLENDİ", "aq-pill aq-pill-sell", 1
+        advice = (
+            f"Fiyat ({snap.last_price:,.2f}) belirlenen {eff_sl:,.2f} stop seviyesinin altında. "
+            "Sermaye koruma disiplini gereği zararı büyütmeden kademeli/tam çıkış değerlendirin."
+        )
+    elif snap.last_price >= eff_tp or (pnl_pct >= 15.0 and sig.rsi_14 >= 72.0):
+        tag, badge_cls, prio = "KÂR REALİZASYONU", "aq-pill aq-pill-warn", 2
+        advice = (
+            f"Pozisyon %{pnl_pct:+.1f} kârda ve hedef/aşırı alım (RSI {sig.rsi_14:.0f}) bölgesinde. "
+            f"Pozisyonun %35–%50'sinde kâr alıp kalan kısım için {eff_sl:,.2f} iz süren stop koymanız rasyoneldir."
+        )
+    elif weight_pct >= 38.0 and total_port_tl > 0:
+        tag, badge_cls, prio = "AĞIRLIK DENGELE", "aq-pill aq-pill-warn", 3
+        advice = (
+            f"Tek varlık toplam portföyün %{weight_pct:.1f}'ini oluşturuyor. "
+            "Sektörel riski azaltmak için kademeli kısmi satışla ağırlığı %25 bandına çekmeyi düşünün."
+        )
+    elif pnl_pct >= 7.0 and sig.sma50_dist_pct > 0:
+        tag, badge_cls, prio = "İZ SÜREN STOP YÜKSELT", "aq-pill aq-pill-buy", 4
+        advice = (
+            f"Trend güçlü (SMA50 +%{sig.sma50_dist_pct:.1f}) ve pozisyon %{pnl_pct:+.1f} kârda. "
+            f"Stop-Loss'u maliyetinizin üzerine ({eff_sl:,.2f}) çekerek risksiz trend takibine geçebilirsiniz."
+        )
+    elif sig.action in ("GÜÇLÜ AL", "AL") and sig.rsi_14 <= 48.0 and weight_pct < 25.0:
+        tag, badge_cls, prio = "KADEMELİ EKLEME", "aq-pill aq-pill-buy", 5
+        advice = (
+            f"Teknik skor güçlü ({sig.composite_score:.0f}/100) ve RSI ({sig.rsi_14:.0f}) soğumuş bölgede. "
+            f"{eff_sl:,.2f} stop disiplini korunarak kademeli lot artırma / maliyet iyileştirme fırsatı sunuyor."
+        )
+    elif sig.action == "SAT" and pnl_pct < -4.0:
+        tag, badge_cls, prio = "RİSKİ AZALT", "aq-pill aq-pill-sell", 2
+        advice = (
+            f"Momentum zayıflıyor (Skor {sig.composite_score:.0f}/100, SMA50 %{sig.sma50_dist_pct:+.1f}). "
+            f"{eff_sl:,.2f} desteği kırılırsa pozisyonu küçültmek sermayeyi korur."
+        )
+    else:
+        tag, badge_cls, prio = "TRENDİ KORU / TUT", "aq-pill aq-pill-hold", 6
+        advice = (
+            f"Pozisyon dengeli seyrediyor (Skor {sig.composite_score:.0f}/100). "
+            f"{eff_sl:,.2f} stop-loss ve {eff_tp:,.2f} hedef fiyat bandını koruyarak takibe devam edin."
+        )
+
+    return {
+        "symbol": snap.symbol, "name": snap.name, "currency": snap.currency,
+        "market_group": snap.market_group, "is_katilim": snap.is_katilim,
+        "qty": qty, "avg_cost": avg_cost, "last_price": snap.last_price,
+        "val_tl": val_tl, "cost_tl": cost_tl, "pnl_tl": pnl_tl, "pnl_pct": pnl_pct,
+        "day_pnl_tl": day_pnl_tl, "weight_pct": weight_pct,
+        "eff_sl": eff_sl, "eff_tp": eff_tp, "dist_sl_pct": dist_sl_pct, "dist_tp_pct": dist_tp_pct,
+        "score": sig.composite_score, "action_tag": tag, "badge_cls": badge_cls,
+        "advice": advice, "priority": prio, "snap": snap, "sig": sig,
+    }
+
+
+def build_portfolio_donut(pos_list: List[Dict[str, Any]], height: int = 230) -> go.Figure:
+    labels = [p["symbol"] for p in pos_list]
+    values = [round(p["val_tl"], 0) for p in pos_list]
+    colors = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#06B6D4", "#EC4899", "#64748B"]
+    fig = go.Figure(
+        data=[
+            go.Pie(
+                labels=labels, values=values, hole=0.62,
+                marker=dict(colors=colors[:len(labels)], line=dict(color="#0A0D12", width=2)),
+                textinfo="label+percent",
+                textfont=dict(size=11, color="#F1F5F9"),
+                hovertemplate="<b>%{label}</b><br>%{value:,.0f} ₺ (%{percent})<extra></extra>",
+            )
+        ]
+    )
+    fig.update_layout(
+        height=height, margin=dict(l=4, r=4, t=8, b=8),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        showlegend=False,
+    )
+    return fig
 
 
 def reset_screener_filters() -> None:
@@ -3218,7 +3346,7 @@ def render_asset_detail_view(
         type="primary" if not in_basket else "secondary",
         use_container_width=True,
     ):
-        toggle_basket(symbol)
+        toggle_basket(symbol, default_price=snap.last_price)
         st.rerun()
 
     # Hero Price Header
@@ -3725,65 +3853,236 @@ def main() -> None:
             st.info("Seçili filtrelere uygun varlık bulunamadı.")
 
     # =========================================================================
-    # WORKSPACE 3: PORTFÖYÜM (SEPET BACKTESTİ + PDF & DARK-MODE E-POSTA RAPORU)
+    # WORKSPACE 3: PORTFÖYÜM (KİŞİSEL TAKİP + PROFESYONEL BORSACI DANIŞMANI)
     # =========================================================================
     else:
-        basket_snaps = [snapshots[s] for s in st.session_state.basket if s in snapshots]
-        basket_sigs = [all_scored[s.symbol] for s in basket_snaps]
+        usdtry_snap = snapshots.get("USDTRY=X")
+        usdtry_rate = float(usdtry_snap.last_price) if usdtry_snap else 34.55
 
-        p_left, p_right = st.columns([1.45, 1.0], gap="large")
-        with p_left:
-            render_html(f"<div class='aq-h2'>Portföy Performans Simülasyonu <span class='aq-h2-sub'>{len(basket_snaps)} varlık · Eşit ağırlık</span></div>")
-            if not basket_snaps:
-                st.info("Portföyünüz henüz boş. Piyasalar veya Keşfet ekranından bir varlık açıp '+ Portföye Ekle' ile ekleyebilirsiniz.")
-            else:
-                bt_res = run_portfolio_basket_backtest(basket_snaps, initial_capital=st.session_state.total_capital_tl)
+        # Ensure every basket symbol has a holding entry
+        holdings = dict(st.session_state.get("portfolio_holdings", {}))
+        for sym in list(st.session_state.basket):
+            if sym in snapshots and sym not in holdings:
+                px = float(snapshots[sym].last_price)
+                holdings[sym] = {"qty": max(1.0, round(25_000.0 / max(px, 1.0), 0)), "avg_cost": px, "custom_sl": 0.0, "custom_tp": 0.0}
+        st.session_state.portfolio_holdings = holdings
+
+        # Top Action Header (+ Pozisyon Ekle / Güncelle Popover)
+        ph_l, ph_r = st.columns([3.8, 1.4])
+        with ph_l:
+            render_html("<div class='aq-h2' style='font-size:18px; margin-bottom:2px;'>Portföyüm & Borsa Danışmanı <span class='aq-h2-sub'>Canlı kâr/zarar, iz süren stop-loss ve masa tavsiyeleri</span></div>")
+        with ph_r:
+            with safe_popover("+ Pozisyon Ekle / Düzenle", use_container_width=True):
+                all_syms = sorted(snapshots.keys())
+                with st.form("v71_add_holding_form", clear_on_submit=False):
+                    p_sym = st.selectbox(
+                        "Varlık Seç",
+                        options=all_syms,
+                        index=all_syms.index("THYAO") if "THYAO" in all_syms else 0,
+                        format_func=lambda s: f"{s} — {snapshots[s].name[:26]} ({snapshots[s].last_price:,.2f} {snapshots[s].currency})",
+                    )
+                    cur_h = holdings.get(p_sym, {})
+                    def_px = float(cur_h.get("avg_cost") or snapshots[p_sym].last_price)
+                    def_qty = float(cur_h.get("qty") or max(1.0, round(25_000.0 / max(def_px, 1.0), 0)))
+                    c_q, c_c = st.columns(2)
+                    in_qty = c_q.number_input("Adet / Lot", min_value=0.01, max_value=10_000_000.0, value=def_qty, step=1.0)
+                    in_cost = c_c.number_input("Ort. Maliyet", min_value=0.0001, max_value=10_000_000.0, value=def_px, format="%.2f")
+                    c_sl, c_tp = st.columns(2)
+                    in_sl = c_sl.number_input("Özel Stop-Loss (0=Oto)", min_value=0.0, max_value=10_000_000.0, value=float(cur_h.get("custom_sl", 0.0)), format="%.2f")
+                    in_tp = c_tp.number_input("Hedef Fiyat TP (0=Oto)", min_value=0.0, max_value=10_000_000.0, value=float(cur_h.get("custom_tp", 0.0)), format="%.2f")
+                    if st.form_submit_button("Portföye Kaydet", type="primary", use_container_width=True):
+                        holdings[p_sym] = {"qty": float(in_qty), "avg_cost": float(in_cost), "custom_sl": float(in_sl), "custom_tp": float(in_tp)}
+                        st.session_state.portfolio_holdings = holdings
+                        if p_sym not in st.session_state.basket:
+                            st.session_state.basket = list(st.session_state.basket) + [p_sym]
+                        st.success(f"{p_sym} portföyünüze kaydedildi.")
+                        st.rerun()
+
+        active_syms = [s for s in st.session_state.basket if s in snapshots and s in holdings]
+        if not active_syms:
+            st.info("Portföyünüzde henüz takip edilen varlık yok. Sağ üstteki '+ Pozisyon Ekle / Düzenle' butonundan veya herhangi bir varlık sayfasından '+ Portföye Ekle' ile başlayabilirsiniz.")
+        else:
+            # First pass: compute total value in TL
+            total_val_tl = 0.0
+            total_cost_tl = 0.0
+            for s in active_syms:
+                sn = snapshots[s]
+                fx = usdtry_rate if sn.currency == "USD" else 1.0
+                q = float(holdings[s].get("qty", 0.0))
+                ac = float(holdings[s].get("avg_cost", sn.last_price))
+                total_val_tl += q * sn.last_price * fx
+                total_cost_tl += q * ac * fx
+
+            pos_list = [
+                evaluate_portfolio_position(snapshots[s], all_scored[s], holdings[s], total_val_tl, usdtry_rate)
+                for s in active_syms
+            ]
+            pos_list.sort(key=lambda x: x["val_tl"], reverse=True)
+
+            tot_pnl_tl = total_val_tl - total_cost_tl
+            tot_pnl_pct = (tot_pnl_tl / max(total_cost_tl, 1e-9)) * 100.0
+            tot_day_tl = sum(p["day_pnl_tl"] for p in pos_list)
+            tot_day_pct = (tot_day_tl / max(total_val_tl - tot_day_tl, 1e-9)) * 100.0
+            health_score = sum(p["score"] * (p["weight_pct"] / 100.0) for p in pos_list)
+            kat_weight = sum(p["weight_pct"] for p in pos_list if p["is_katilim"])
+
+            pnl_col = "#10B981" if tot_pnl_tl >= 0 else "#EF4444"
+            day_col = "#10B981" if tot_day_tl >= 0 else "#EF4444"
+
+            # 4-Card Calm Portfolio KPI Strip
+            render_html(
+                f"""
+                <div class="aq-ticker-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top:10px; margin-bottom:18px;">
+                    <div class="aq-ticker-card">
+                        <div class="aq-ticker-lbl">TOPLAM PORTFÖY DEĞERİ</div>
+                        <div class="aq-ticker-val" style="font-size:21px;">{total_val_tl:,.0f} ₺</div>
+                        <div class="aq-ticker-chg" style="color:#94A3B8;">Maliyet: {total_cost_tl:,.0f} ₺ · {len(pos_list)} varlık</div>
+                    </div>
+                    <div class="aq-ticker-card">
+                        <div class="aq-ticker-lbl">TOPLAM KÂR / ZARAR</div>
+                        <div class="aq-ticker-val" style="font-size:21px; color:{pnl_col};">{tot_pnl_tl:+,.0f} ₺</div>
+                        <div class="aq-ticker-chg" style="color:{pnl_col};">{'▲' if tot_pnl_pct >= 0 else '▼'} {tot_pnl_pct:+.2f}% genel getiri</div>
+                    </div>
+                    <div class="aq-ticker-card">
+                        <div class="aq-ticker-lbl">GÜNLÜK DEĞİŞİM</div>
+                        <div class="aq-ticker-val" style="font-size:21px; color:{day_col};">{tot_day_tl:+,.0f} ₺</div>
+                        <div class="aq-ticker-chg" style="color:{day_col};">{'▲' if tot_day_pct >= 0 else '▼'} {tot_day_pct:+.2f}% bugün</div>
+                    </div>
+                    <div class="aq-ticker-card">
+                        <div class="aq-ticker-lbl">PORTFÖY SAĞLIK SKORU</div>
+                        <div class="aq-ticker-val" style="font-size:21px; color:#60A5FA;">{health_score:.1f} / 100</div>
+                        <div class="aq-ticker-chg" style="color:#94A3B8;">Katılım Oranı: %{kat_weight:.0f}</div>
+                    </div>
+                </div>
+                """
+            )
+
+            # 3 Clean Internal Sub-Tabs inside Portföyüm
+            pt_pos, pt_bt, pt_rep = st.tabs(["Pozisyonlar & Borsacı Tavsiyeleri", "Portföy Backtesti", "PDF & E-Posta Raporu"])
+
+            with pt_pos:
+                col_tbl, col_coach = st.columns([1.42, 1.0], gap="large")
+
+                with col_tbl:
+                    render_html("<div class='aq-h2'>Pozisyon Takibi <span class='aq-h2-sub'>Detayını açmak için satıra tıklayın</span></div>")
+                    pos_df = pd.DataFrame([
+                        {
+                            "Sembol": p["symbol"],
+                            "Adet": round(p["qty"], 2),
+                            "Maliyet": round(p["avg_cost"], 2),
+                            "Fiyat": p["last_price"],
+                            "Birim": p["currency"],
+                            "Değer (TL)": round(p["val_tl"], 0),
+                            "Günlük %": p["pnl_pct"],
+                            "Ağırlık %": round(p["weight_pct"], 1),
+                            "Stop-Loss": p["eff_sl"],
+                            "Hedef TP": p["eff_tp"],
+                            "Masa Tavsiyesi": p["action_tag"],
+                        }
+                        for p in pos_list
+                    ])
+                    # Rename Günlük % column label cleanly to K/Z % for clarity
+                    pos_df = pos_df.rename(columns={"Günlük %": "K/Z %"})
+                    col_cfg_p = {}
+                    if hasattr(st, "column_config"):
+                        cc = st.column_config
+                        if hasattr(cc, "NumberColumn"):
+                            col_cfg_p["Değer (TL)"] = cc.NumberColumn("Değer (TL)", format="%,.0f ₺")
+                            col_cfg_p["K/Z %"] = cc.NumberColumn("K/Z %", format="%+.2f%%")
+                            col_cfg_p["Ağırlık %"] = cc.NumberColumn("Ağırlık", format="%.1f%%")
+                    try:
+                        ev = st.dataframe(
+                            pos_df, use_container_width=True, hide_index=True, height=300,
+                            column_config=col_cfg_p or None, on_select="rerun", selection_mode="single-row",
+                        )
+                        sel_r = getattr(getattr(ev, "selection", None), "rows", None)
+                        if sel_r:
+                            open_detail(pos_list[int(sel_r[0])]["symbol"])
+                            st.rerun()
+                    except TypeError:
+                        st.dataframe(pos_df, use_container_width=True, hide_index=True, height=300, column_config=col_cfg_p or None)
+
+                    # Compact Position Management Strip (Quick Remove)
+                    rm_c1, rm_c2 = st.columns([2.4, 1.1])
+                    rm_target = rm_c1.selectbox(
+                        "Pozisyon Kaldır", options=[p["symbol"] for p in pos_list],
+                        format_func=lambda s: f"{s} ({holdings[s]['qty']:,.0f} adet)",
+                        label_visibility="collapsed",
+                    )
+                    if rm_c2.button("Pozisyonu Çıkar", use_container_width=True):
+                        toggle_basket(rm_target)
+                        st.rerun()
+
+                    # Allocation Donut Chart
+                    render_html("<div class='aq-h2' style='margin-top:14px;'>Varlık Dağılımı</div>")
+                    st.plotly_chart(build_portfolio_donut(pos_list, height=230), use_container_width=True, key="v71_donut")
+
+                with col_coach:
+                    render_html("<div class='aq-h2'>Profesyonel Masa Yönlendirmeleri <span class='aq-h2-sub'>Öncelik sırasına göre</span></div>")
+                    coached = sorted(pos_list, key=lambda x: x["priority"])
+                    for idx_c, p in enumerate(coached):
+                        p_col = "#10B981" if p["pnl_pct"] >= 0 else "#EF4444"
+                        render_html(
+                            f"""
+                            <div class="aq-news-item">
+                                <div class="aq-row-between">
+                                    <div>
+                                        <span class="aq-sym">{html.escape(p['symbol'])}</span>
+                                        <span class="{p['badge_cls']}" style="margin-left:6px;">{html.escape(p['action_tag'])}</span>
+                                    </div>
+                                    <span class="aq-mono" style="font-size:12.5px; color:{p_col}; font-weight:600;">{p['pnl_pct']:+.1f}% ({p['pnl_tl']:+,.0f} ₺)</span>
+                                </div>
+                                <div style="font-size:12.5px; color:#CBD5E1; line-height:1.55; margin-top:8px;">
+                                    {html.escape(p['advice'])}
+                                </div>
+                                <div class="aq-row-between" style="margin-top:9px; padding-top:8px; border-top:1px solid rgba(148,163,184,0.10); font-size:11.5px; color:#94A3B8; font-family:'JetBrains Mono',monospace;">
+                                    <span>Stop: <b style="color:#FCA5A5;">{p['eff_sl']:,.2f}</b> (-%{max(p['dist_sl_pct'], 0):.1f})</span>
+                                    <span>Hedef: <b style="color:#6EE7B7;">{p['eff_tp']:,.2f}</b> (+%{max(p['dist_tp_pct'], 0):.1f})</span>
+                                    <span>Ağırlık: %{p['weight_pct']:.1f}</span>
+                                </div>
+                            </div>
+                            """
+                        )
+                        if st.button(f"{p['symbol']} Grafiğini İncele →", key=f"coach_go_{idx_c}_{p['symbol']}", use_container_width=True):
+                            open_detail(p["symbol"])
+                            st.rerun()
+
+            with pt_bt:
+                basket_snaps = [p["snap"] for p in pos_list]
+                bt_res = run_portfolio_basket_backtest(basket_snaps, initial_capital=max(total_val_tl, 50_000.0))
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Strateji Getirisi", f"%{bt_res['total_ret_pct']:+.2f}")
                 m2.metric("Al & Tut", f"%{bt_res['bh_ret_pct']:+.2f}")
                 m3.metric("Maks. Düşüş", f"%{bt_res['max_dd_pct']:.2f}")
                 m4.metric("Sharpe Oranı", f"{bt_res['sharpe']:.2f}")
-                st.plotly_chart(build_backtest_chart(bt_res, height=340, label="Portföyüm (Strateji)"), use_container_width=True, key="v7_port_bt")
+                st.plotly_chart(build_backtest_chart(bt_res, height=340, label="Portföyüm (AlpQuant Strateji)"), use_container_width=True, key="v71_port_bt")
 
-        with p_right:
-            render_html("<div class='aq-h2'>Portföyümdeki Varlıklar</div>")
-            if basket_snaps:
-                for bs in basket_snaps:
-                    bg = all_scored[bs.symbol]
-                    bc1, bc2, bc3 = st.columns([2.6, 0.85, 0.65], gap="small")
-                    bc1.markdown(f"**{bs.symbol}** · `{bs.last_price:,.2f} {bs.currency}` · {bg.action} ({bg.composite_score:.0f}p)")
-                    if bc2.button("Aç", key=f"v7_po_{bs.symbol}", use_container_width=True):
-                        open_detail(bs.symbol)
-                        st.rerun()
-                    if bc3.button("×", key=f"v7_pr_{bs.symbol}", use_container_width=True):
-                        toggle_basket(bs.symbol)
-                        st.rerun()
-
-            render_html("<div class='aq-divider'></div>")
-            render_html("<div class='aq-h2'>Rapor & E-Posta Gönderimi</div>")
-            export_sigs = basket_sigs if basket_sigs else sorted(all_scored.values(), key=lambda x: x.composite_score, reverse=True)[:20]
-            pdf_bytes = generate_pdf_bytes(export_sigs, profile)
-            st.download_button(
-                "Portföy Raporunu PDF İndir" if HAS_FPDF else "Raporu İndir (TXT)",
-                data=pdf_bytes,
-                file_name=f"alpquant_portfoy_{datetime.now().strftime('%Y%m%d')}.{'pdf' if HAS_FPDF else 'txt'}",
-                mime="application/pdf" if HAS_FPDF else "text/plain",
-                type="primary",
-                use_container_width=True,
-            )
-            html_report = EmailSignalNotifier.build_html_report(export_sigs, profile, "Portföyüm")
-            if st.button("Raporu E-Posta Gönder", use_container_width=True):
-                ok, msg = EmailSignalNotifier.send_email(
-                    st.session_state.smtp_user, st.session_state.smtp_pass, st.session_state.email_recipient,
-                    f"AlpQuant Pro Portföy Raporu ({len(export_sigs)} Varlık)", html_report,
-                )
-                if ok:
-                    st.success(msg)
-                else:
-                    st.warning(msg)
-
-            with st.expander("E-Posta HTML Önizleme", expanded=False):
-                render_html(html_report)
+            with pt_rep:
+                export_sigs = [p["sig"] for p in pos_list]
+                r1, r2 = st.columns(2, gap="medium")
+                pdf_bytes = generate_pdf_bytes(export_sigs, profile)
+                with r1:
+                    st.download_button(
+                        "Portföy Raporunu PDF İndir" if HAS_FPDF else "Raporu İndir (TXT)",
+                        data=pdf_bytes,
+                        file_name=f"alpquant_portfoy_{datetime.now().strftime('%Y%m%d')}.{'pdf' if HAS_FPDF else 'txt'}",
+                        mime="application/pdf" if HAS_FPDF else "text/plain",
+                        type="primary",
+                        use_container_width=True,
+                    )
+                html_report = EmailSignalNotifier.build_html_report(export_sigs, profile, "Portföyüm")
+                with r2:
+                    if st.button("Portföy Raporunu E-Posta Gönder", use_container_width=True):
+                        ok, msg = EmailSignalNotifier.send_email(
+                            st.session_state.smtp_user, st.session_state.smtp_pass, st.session_state.email_recipient,
+                            f"AlpQuant Pro Portföy Danışman Raporu ({len(export_sigs)} Varlık)", html_report,
+                        )
+                        if ok:
+                            st.success(msg)
+                        else:
+                            st.warning(msg)
+                with st.expander("E-Posta HTML Rapor Önizlemesi", expanded=False):
+                    render_html(html_report)
 
 
 if __name__ == "__main__":
