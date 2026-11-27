@@ -50,7 +50,7 @@ except Exception:
 # 1. PAGE CONFIG & TURKISH NORMALIZATION HELPERS
 # =============================================================================
 st.set_page_config(
-    page_title="AlpQuant Pro v7.3 | Kurumsal Yatırım Platformu",
+    page_title="AlpQuant Pro v8.0 | Kurumsal Yatırım Platformu",
     page_icon="◈",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -100,7 +100,7 @@ def safe_popover(label: str, use_container_width: bool = True):
 # =============================================================================
 @dataclass
 class SuitabilityProfile:
-    user_id: str = "alperen_gulluoglu"
+    user_id: str = "yatirimci"
     risk_score: int = 5
     risk_label: str = "Çok Yüksek Risk (Agresif / Profesyonel)"
     approved_levels: List[int] = field(default_factory=lambda: [1, 2, 3, 4, 5])
@@ -3305,6 +3305,82 @@ HOME_LENSES = ["Tümü", "BIST", "Katılım", "TEFAS", "ABD & ETF", "Kripto"]
 SCREENER_PRESETS = ["Tümü", "Güçlü AL (75+)", "Dip Dönüş (RSI<40)", "Hacim Artışı", "Değer (F/K<12)"]
 
 
+
+PORTFOLIO_STORE_PATH = Path(__file__).resolve().parent / ".alpquant_portfolio.json"
+
+
+def _encode_holdings_param(holdings: Dict[str, Dict[str, float]], basket: List[str]) -> str:
+    parts = []
+    for sym in basket[:25]:
+        h = holdings.get(sym)
+        if h:
+            parts.append(f"{sym}:{h.get('qty', 1):.4g}:{h.get('avg_cost', 1):.6g}:{h.get('custom_sl', 0):.6g}:{h.get('custom_tp', 0):.6g}")
+    return ",".join(parts)
+
+
+def _decode_holdings_param(raw: str) -> Tuple[List[str], Dict[str, Dict[str, float]]]:
+    basket: List[str] = []
+    holdings: Dict[str, Dict[str, float]] = {}
+    for token in (raw or "").split(","):
+        bits = token.strip().split(":")
+        if len(bits) >= 3 and bits[0]:
+            sym = bits[0].upper()
+            try:
+                qty = float(bits[1])
+                cost = float(bits[2])
+                csl = float(bits[3]) if len(bits) > 3 else 0.0
+                ctp = float(bits[4]) if len(bits) > 4 else 0.0
+                if qty > 0 and cost > 0:
+                    basket.append(sym)
+                    holdings[sym] = {"qty": qty, "avg_cost": cost, "custom_sl": csl, "custom_tp": ctp}
+            except Exception:
+                continue
+    return basket, holdings
+
+
+def save_persistent_state() -> None:
+    """Persists portfolio holdings, basket, and SPK profile to local JSON and URL query params."""
+    payload = {
+        "basket": list(st.session_state.get("basket", [])),
+        "portfolio_holdings": dict(st.session_state.get("portfolio_holdings", {})),
+        "total_capital_tl": float(st.session_state.get("total_capital_tl", 250_000.0)),
+        "spk_level": int(getattr(st.session_state.get("suitability_profile"), "risk_score", 5)),
+    }
+    try:
+        PORTFOLIO_STORE_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    try:
+        if hasattr(st, "query_params"):
+            encoded = _encode_holdings_param(payload["portfolio_holdings"], payload["basket"])
+            if encoded:
+                st.query_params["pf"] = encoded
+            elif "pf" in st.query_params:
+                del st.query_params["pf"]
+    except Exception:
+        pass
+
+
+def load_persistent_state() -> Optional[Dict[str, Any]]:
+    """Restores portfolio state from URL query params first, then local JSON store."""
+    try:
+        if hasattr(st, "query_params") and "pf" in st.query_params:
+            raw_pf = str(st.query_params["pf"])
+            b, h = _decode_holdings_param(raw_pf)
+            if b:
+                return {"basket": b, "portfolio_holdings": h}
+    except Exception:
+        pass
+    try:
+        if PORTFOLIO_STORE_PATH.exists():
+            data = json.loads(PORTFOLIO_STORE_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data.get("portfolio_holdings"):
+                return data
+    except Exception:
+        pass
+    return None
+
+
 def init_session_state() -> None:
     defaults = {
         "workspace": "Piyasalar",       # Piyasalar | Keşfet | Portföyüm
@@ -3326,7 +3402,7 @@ def init_session_state() -> None:
         "gemini_api_key": os.environ.get("GEMINI_API_KEY", ""),
         "smtp_user": "",
         "smtp_pass": "",
-        "email_recipient": "alperengulluoglu@gmail.com",
+        "email_recipient": "",
         "search_query": "",
         "market_group": "Tüm Piyasalar (1,100+)",
         "katilim_mode": "Tümü (Konv. + Katılım)",
@@ -3346,6 +3422,34 @@ def init_session_state() -> None:
         "min_score": 0.0,
         "hide_spk_blocked": False,
     }
+    if "state_restored" not in st.session_state:
+        saved = load_persistent_state()
+        if saved:
+            if saved.get("basket"):
+                defaults["basket"] = saved["basket"]
+            if saved.get("portfolio_holdings"):
+                defaults["portfolio_holdings"] = saved["portfolio_holdings"]
+            if saved.get("total_capital_tl"):
+                defaults["total_capital_tl"] = float(saved["total_capital_tl"])
+            if saved.get("spk_level"):
+                rl = int(saved["spk_level"])
+                lbls = {
+                    1: "Çok Düşük Risk (Muhafazakâr)", 2: "Düşük-Orta Risk (Temkinli)",
+                    3: "Orta Risk (Dengeli)", 4: "Yüksek Risk (Büyüme Odaklı)",
+                    5: "Çok Yüksek Risk (Agresif / Profesyonel)",
+                }
+                defaults["suitability_profile"] = SuitabilityProfile(
+                    risk_score=rl, risk_label=lbls.get(rl, lbls[5]),
+                    approved_levels=list(range(1, rl + 1)), max_single_weight=0.10 + rl * 0.03,
+                )
+        st.session_state["state_restored"] = True
+
+    try:
+        if hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
+            defaults["gemini_api_key"] = str(st.secrets["GEMINI_API_KEY"])
+    except Exception:
+        pass
+
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
@@ -3374,6 +3478,7 @@ def toggle_basket(symbol: str, default_price: float = 0.0) -> None:
             holdings[symbol] = {"qty": est_qty, "avg_cost": px, "custom_sl": 0.0, "custom_tp": 0.0}
     st.session_state.basket = b
     st.session_state.portfolio_holdings = holdings
+    save_persistent_state()
 
 
 def evaluate_portfolio_position(
@@ -3413,48 +3518,81 @@ def evaluate_portfolio_position(
     dist_sl_pct = ((snap.last_price - eff_sl) / max(snap.last_price, 1e-9)) * 100.0
     dist_tp_pct = ((eff_tp - snap.last_price) / max(snap.last_price, 1e-9)) * 100.0
 
-    # Pro Desk Action & Trader Commentary
+    # Pro Desk Action, Technical Rationale & Behavioral Psychology Coach
+    rationale = (
+        f"Teknik skor {sig.composite_score:.0f}/100 · RSI-14: {sig.rsi_14:.1f} · "
+        f"SMA50 farkı %{sig.sma50_dist_pct:+.1f} · Hacim Z: {sig.vol_zscore:+.2f}."
+    )
+
     if snap.last_price <= eff_sl:
         tag, badge_cls, prio = "STOP-LOSS TETİKLENDİ", "aq-pill aq-pill-sell", 1
         advice = (
-            f"Fiyat ({snap.last_price:,.2f}) belirlenen {eff_sl:,.2f} stop seviyesinin altında. "
-            "Sermaye koruma disiplini gereği zararı büyütmeden kademeli/tam çıkış değerlendirin."
+            f"Fiyat ({snap.last_price:,.2f}) belirlenen {eff_sl:,.2f} koruma seviyesinin altında. "
+            "Sermaye koruma kuralı gereği pozisyonu kademeli kapatarak nakit esnekliği kazanmanız önerilir."
+        )
+        psych_note = (
+            "Kayıptan kaçınma (Loss Aversion) uyarısı: 'Maliyetine gelsin satarım' beklentisi küçük zararı kronikleştirir. "
+            "Stop-loss bir yenilgi değil, bir sonraki fırsata sermaye saklama disiplinidir."
         )
     elif snap.last_price >= eff_tp or (pnl_pct >= 15.0 and sig.rsi_14 >= 72.0):
         tag, badge_cls, prio = "KÂR REALİZASYONU", "aq-pill aq-pill-warn", 2
         advice = (
-            f"Pozisyon %{pnl_pct:+.1f} kârda ve hedef/aşırı alım (RSI {sig.rsi_14:.0f}) bölgesinde. "
-            f"Pozisyonun %35–%50'sinde kâr alıp kalan kısım için {eff_sl:,.2f} iz süren stop koymanız rasyoneldir."
+            f"Pozisyon %{pnl_pct:+.1f} kârda ve hedef/aşırı alım (RSI {sig.rsi_14:.0f}) bölgesine ulaştı. "
+            f"Pozisyonun %35–%50'sini realize edip kalan kısma {eff_sl:,.2f} iz süren stop koymanız rasyoneldir."
+        )
+        psych_note = (
+            "FOMO ve açgözlülük dengesi: Zirveyi tek noktada yakalamaya çalışmak yerine kademeli kâr almak, "
+            "olası geri çekilmelerde pişmanlık stresini sıfırlar."
         )
     elif weight_pct >= 38.0 and total_port_tl > 0:
         tag, badge_cls, prio = "AĞIRLIK DENGELE", "aq-pill aq-pill-warn", 3
         advice = (
-            f"Tek varlık toplam portföyün %{weight_pct:.1f}'ini oluşturuyor. "
-            "Sektörel riski azaltmak için kademeli kısmi satışla ağırlığı %25 bandına çekmeyi düşünün."
+            f"Bu varlık toplam portföyün %{weight_pct:.1f}'ini kaplıyor. "
+            "Tek varlık riskini düşürmek için yükselişlerde ağırlığı %25 bandına çekip diğer sektörlere dağıtın."
+        )
+        psych_note = (
+            "Aşırı güven (Overconfidence) tuzağı: Çok inandığımız tek varlığa duygusal bağ kurmak, "
+            "beklenmedik tek bir KAP/piyasa haberinde tüm portföy psikolojisini bozabilir."
         )
     elif pnl_pct >= 7.0 and sig.sma50_dist_pct > 0:
         tag, badge_cls, prio = "İZ SÜREN STOP YÜKSELT", "aq-pill aq-pill-buy", 4
         advice = (
-            f"Trend güçlü (SMA50 +%{sig.sma50_dist_pct:.1f}) ve pozisyon %{pnl_pct:+.1f} kârda. "
-            f"Stop-Loss'u maliyetinizin üzerine ({eff_sl:,.2f}) çekerek risksiz trend takibine geçebilirsiniz."
+            f"Trend güçlü ve pozisyon %{pnl_pct:+.1f} kârda. "
+            f"Stop-Loss'u maliyetinizin üzerine ({eff_sl:,.2f}) çekerek ana paranızı koruma altına alın ve trendi sürdürün."
+        )
+        psych_note = (
+            "Erken kâr kesme dürtüsü (Disposition Effect): Kazananı sırf kârı kaybetme korkusuyla erken satmak yerine "
+            "iz süren stop ile trendin devamından sakin biçimde yararlanın."
         )
     elif sig.action in ("GÜÇLÜ AL", "AL") and sig.rsi_14 <= 48.0 and weight_pct < 25.0:
         tag, badge_cls, prio = "KADEMELİ EKLEME", "aq-pill aq-pill-buy", 5
         advice = (
-            f"Teknik skor güçlü ({sig.composite_score:.0f}/100) ve RSI ({sig.rsi_14:.0f}) soğumuş bölgede. "
-            f"{eff_sl:,.2f} stop disiplini korunarak kademeli lot artırma / maliyet iyileştirme fırsatı sunuyor."
+            f"Kompozit skor güçlü ({sig.composite_score:.0f}/100) ve RSI ({sig.rsi_14:.0f}) soğumuş bölgede. "
+            f"{eff_sl:,.2f} stop disiplini korunarak 2–3 parçalı kademeli ekleme ile ortalama maliyet optimize edilebilir."
+        )
+        psych_note = (
+            "Duygusal zamanlama kontrolü: Düşüş veya yatay dönemlerde panik yerine önceden tanımlı kademelerle ekleme yapmak "
+            "karar kalitenizi piyasa gürültüsünden bağımsız kılar."
         )
     elif sig.action == "SAT" and pnl_pct < -4.0:
         tag, badge_cls, prio = "RİSKİ AZALT", "aq-pill aq-pill-sell", 2
         advice = (
-            f"Momentum zayıflıyor (Skor {sig.composite_score:.0f}/100, SMA50 %{sig.sma50_dist_pct:+.1f}). "
-            f"{eff_sl:,.2f} desteği kırılırsa pozisyonu küçültmek sermayeyi korur."
+            f"Momentum zayıflıyor ve fiyat ortalamaların altında. "
+            f"{eff_sl:,.2f} desteği kırılırsa pozisyonu küçültmek sermaye erimesini önler."
+        )
+        psych_note = (
+            "Batık maliyet yanılgısı (Sunk Cost): Geçmişte ödediğiniz maliyet piyasanın umurunda değildir; "
+            "bugün bu varlığı sıfırdan alır mıydınız sorusunu dürüstçe sorun."
         )
     else:
         tag, badge_cls, prio = "TRENDİ KORU / TUT", "aq-pill aq-pill-hold", 6
         advice = (
-            f"Pozisyon dengeli seyrediyor (Skor {sig.composite_score:.0f}/100). "
-            f"{eff_sl:,.2f} stop-loss ve {eff_tp:,.2f} hedef fiyat bandını koruyarak takibe devam edin."
+            f"Pozisyon sağlıklı aralıkta ilerliyor. "
+            f"{eff_sl:,.2f} stop-loss ve {eff_tp:,.2f} hedef fiyat bandını koruyarak planınıza sadık kalın."
+        )
+        psych_note = (
+            "Aşırı işlem (Overtrading) karşıtı disiplin: Her gün al-sat yapmak zorunda değilsiniz; "
+            "teziniz ve stop seviyeniz bozulmadığı sürece sabır en kârlı pozisyondur."
         )
 
     return {
@@ -3465,7 +3603,7 @@ def evaluate_portfolio_position(
         "day_pnl_tl": day_pnl_tl, "weight_pct": weight_pct,
         "eff_sl": eff_sl, "eff_tp": eff_tp, "dist_sl_pct": dist_sl_pct, "dist_tp_pct": dist_tp_pct,
         "score": sig.composite_score, "action_tag": tag, "badge_cls": badge_cls,
-        "advice": advice, "priority": prio, "snap": snap, "sig": sig,
+        "advice": advice, "rationale": rationale, "psych_note": psych_note, "priority": prio, "snap": snap, "sig": sig,
     }
 
 
@@ -3802,6 +3940,7 @@ def main() -> None:
                             user_id=profile.user_id, risk_score=rl, risk_label=lbls[rl],
                             approved_levels=list(range(1, rl + 1)), max_single_weight=0.10 + rl * 0.03,
                         )
+                        save_persistent_state()
                         st.success(f"SPK Seviye {rl}/5 kaydedildi.")
                         st.rerun()
             with pt2:
@@ -3811,8 +3950,11 @@ def main() -> None:
                 st.session_state.use_live_tv = st.checkbox("Canlı TradingView Fiyatları", value=st.session_state.use_live_tv)
                 st.session_state.use_live_rss = st.checkbox("Canlı KAP & Finans Haberleri", value=st.session_state.use_live_rss)
                 st.session_state.use_live_yf_chart = st.checkbox("Grafikte Canlı Yahoo Finance", value=st.session_state.use_live_yf_chart)
-                st.session_state.gemini_api_key = st.text_input("Gemini API Key (Opsiyonel)", value=st.session_state.gemini_api_key, type="password")
-                st.session_state.email_recipient = st.text_input("E-Posta Alıcısı", value=st.session_state.email_recipient)
+                st.session_state.email_recipient = st.text_input(
+                    "Rapor E-Posta Adresi (Opsiyonel)",
+                    value=st.session_state.email_recipient,
+                    placeholder="ornek@eposta.com",
+                )
                 ec1, ec2 = st.columns(2)
                 st.session_state.smtp_user = ec1.text_input("SMTP E-Posta", value=st.session_state.smtp_user)
                 st.session_state.smtp_pass = ec2.text_input("Uygulama Şifresi", value=st.session_state.smtp_pass, type="password")
@@ -3961,17 +4103,22 @@ def main() -> None:
                 st.rerun()
 
     # =========================================================================
-    # WORKSPACE 2: KEŞFET (DEDICATED PRO SCREENER — FILTERS LIVE ONLY HERE)
+    # WORKSPACE 2: KEŞFET (ELEGANT KÜRATÖRLÜ KEŞİF + FİLTRE + PREMİUM LİSTE)
     # =========================================================================
     elif cur_ws == "Keşfet":
-        f1, f2, f3, f4 = st.columns([2.5, 1.65, 1.75, 1.0], gap="small")
+        render_html(
+            f"<div class='aq-h2' style='font-size:19px; margin-bottom:14px;'>Keşfet "
+            f"<span class='aq-h2-sub'>{len(snapshots):,} varlık · Küratörlü temalar, akıllı filtreler ve anlık tarama</span></div>"
+        )
+
+        # 1. Refined Search & Primary Filter Bar
+        f1, f2, f3, f4 = st.columns([2.6, 1.55, 1.7, 1.05], gap="small")
         with f1:
             st.session_state.search_query = st.text_input(
                 "Ara", value=st.session_state.search_query,
-                placeholder="Sembol, fon veya şirket ara (ör. THYAO, KTV, MSTR, BTC)...",
+                placeholder="Sembol, fon veya şirket ara (ör. THYAO, KPC, KPU, NVDA, BTC)...",
                 label_visibility="collapsed",
             )
-
         market_options = [
             "Tüm Piyasalar (1,100+)", "BIST Payları", "TEFAS Fonları",
             "Küresel ETF & ABD", "Döviz, Altın & Sukuk", "Kripto & 3x ETF",
@@ -3979,7 +4126,6 @@ def main() -> None:
         with f2:
             mg_v = st.session_state.market_group if st.session_state.market_group in market_options else market_options[0]
             st.session_state.market_group = st.selectbox("Piyasa", market_options, index=market_options.index(mg_v), label_visibility="collapsed")
-
         katilim_options = [
             "Tümü (Konv. + Katılım)", "Sadece Katılım Uyumlu",
             "BIST Katılım (XKTUM)", "TEFAS Katılım Fonları (53+)", "İslami ETF & Sukuk",
@@ -3987,7 +4133,6 @@ def main() -> None:
         with f3:
             km_v = st.session_state.katilim_mode if st.session_state.katilim_mode in katilim_options else katilim_options[0]
             st.session_state.katilim_mode = st.selectbox("Katılım", katilim_options, index=katilim_options.index(km_v), label_visibility="collapsed")
-
         with f4:
             with safe_popover("⚙ Filtreler", use_container_width=True):
                 mg = st.session_state.market_group
@@ -4021,12 +4166,28 @@ def main() -> None:
                     reset_screener_filters()
                     st.rerun()
 
-        # 1-Click Strategy Preset Strip
-        p_cols = st.columns(len(SCREENER_PRESETS) + 1, gap="small")
-        for i_p, p_lbl in enumerate(SCREENER_PRESETS):
-            if p_cols[i_p].button(p_lbl, key=f"v7_pr_{i_p}", type="primary" if st.session_state.screener_preset == p_lbl else "secondary", use_container_width=True):
-                st.session_state.screener_preset = p_lbl
-                st.rerun()
+        # 2. Curated Discovery Themes (4 Elegant Cards — replaces raw button row)
+        render_html("<div style='height:10px;'></div>")
+        curated_themes = [
+            ("Tümü", "Tüm Evren", "Geniş piyasa taraması"),
+            ("Güçlü AL (75+)", "Güçlü Momentum", "Skor 75+ & pozitif trend"),
+            ("Dip Dönüş (RSI<40)", "Dip Fırsatları", "RSI < 40 tepki adayları"),
+            ("Değer (F/K<12)", "Değer & Çarpan", "F/K < 12 iskontolu paylar"),
+        ]
+        th_cols = st.columns(4, gap="medium")
+        for idx_t, (t_key, t_title, t_desc) in enumerate(curated_themes):
+            is_act = st.session_state.screener_preset == t_key
+            b_sty = "border-color: rgba(59,130,246,0.65); background:#141C2E;" if is_act else ""
+            with th_cols[idx_t]:
+                render_html(
+                    f"<div class='aq-ticker-card' style='margin-bottom:6px; {b_sty}'>"
+                    f"<div style='font-size:13.5px; font-weight:600; color:#F8FAFC;'>{t_title}</div>"
+                    f"<div style='font-size:11.5px; color:#64748B; margin-top:3px;'>{t_desc}</div></div>"
+                )
+                if st.button("Aktif ✓" if is_act else "Seç", key=f"v8_th_{idx_t}", type="primary" if is_act else "secondary", use_container_width=True):
+                    st.session_state.screener_preset = t_key
+                    st.session_state["kesfet_page"] = 1
+                    st.rerun()
 
         mg_f = "Tüm Piyasalar (840+)" if st.session_state.market_group.startswith("Tüm Piyasalar") else st.session_state.market_group
         km_f = "TEFAS Katılım Fonları (53)" if st.session_state.katilim_mode.startswith("TEFAS Katılım") else st.session_state.katilim_mode
@@ -4047,13 +4208,11 @@ def main() -> None:
             matched = [(s, g) for s, g in matched if g.composite_score >= 75.0]
         elif pr == "Dip Dönüş (RSI<40)":
             matched = [(s, g) for s, g in matched if g.rsi_14 < 40.0]
-        elif pr == "Hacim Artışı":
-            matched = [(s, g) for s, g in matched if g.vol_zscore > 1.5]
         elif pr == "Değer (F/K<12)":
             matched = [(s, g) for s, g in matched if s.pe_ratio is not None and 0 < s.pe_ratio < 12.0]
         matched.sort(key=lambda x: x[1].composite_score, reverse=True)
 
-        # On-demand live lookup when searched ticker isn't in catalog
+        # On-demand live lookup when searched ticker isn't found locally
         raw_q = st.session_state.search_query.strip().upper()
         if raw_q and len(raw_q) <= 12 and not matched:
             lk1, lk2 = st.columns([3.5, 1.5])
@@ -4068,38 +4227,141 @@ def main() -> None:
                     st.warning(f"'{raw_q}' için canlı veri bulunamadı.")
 
         if matched:
-            tbl_df = pd.DataFrame([
+            # 3. Top 3 Visual Spotlight Cards for Current Filter
+            render_html("<div style='height:12px;'></div>")
+            render_html(f"<div class='aq-h2'>Öne Çıkan Fırsatlar <span class='aq-h2-sub'>{len(matched):,} eşleşen varlıktan ilk 3</span></div>")
+            sp_cols = st.columns(min(3, len(matched)), gap="medium")
+            for idx_sp, (sp_s, sp_g) in enumerate(matched[:3]):
+                dec_sp = 4 if sp_s.last_price < 10 else 2
+                kat_lbl = "<span style='color:#34D399; font-size:10.5px; margin-left:6px;'>● Katılım</span>" if sp_s.is_katilim else ""
+                with sp_cols[idx_sp]:
+                    render_html(
+                        f"""
+                        <div class="aq-shine-card">
+                            <div class="aq-row-between">
+                                <div><span class="aq-sym">{html.escape(sp_s.symbol)}</span>{kat_lbl}</div>
+                                <span class="{action_pill_class(sp_g.action)}">{html.escape(sp_g.action)} · {sp_g.composite_score:.0f}p</span>
+                            </div>
+                            <div class="aq-sub" style="margin:4px 0 10px 0;">{html.escape(sp_s.name)}</div>
+                            <div class="aq-row-between">
+                                <span class="aq-mono" style="font-size:16px; font-weight:700; color:#F8FAFC;">{sp_s.last_price:,.{dec_sp}f} {sp_s.currency}</span>
+                                <span class="{'aq-pos' if sp_s.change_pct >= 0 else 'aq-neg'}" style="font-size:12.5px;">{sp_s.change_pct:+.2f}%</span>
+                            </div>
+                            <div style="font-size:11.5px; color:#64748B; margin-top:8px;">{html.escape(sp_g.reasons[0])}</div>
+                        </div>
+                        """
+                    )
+                    if st.button(f"{sp_s.symbol} İncele →", key=f"v8_sp_{idx_sp}_{sp_s.symbol}", use_container_width=True):
+                        open_detail(sp_s.symbol)
+                        st.rerun()
+
+            # 4. Elegant Custom-Styled Discovery List (with clean Pagination + View Switcher)
+            render_html("<div style='height:14px;'></div>")
+            lh_1, lh_2, lh_3 = st.columns([2.6, 1.3, 1.1])
+            lh_1.markdown(f"<div class='aq-h2'>Tarama Sonuçları <span class='aq-h2-sub'>{len(matched):,} varlık</span></div>", unsafe_allow_html=True)
+            view_mode = lh_2.selectbox("Görünüm", ["Şık Liste", "Sparkline Tablo"], index=0, label_visibility="collapsed")
+            csv_export = pd.DataFrame([
                 {
-                    "Sembol": s.symbol,
-                    "Varlık": s.name[:34],
-                    "Piyasa": s.market_group,
-                    "Katılım": "✓" if s.is_katilim else "—",
-                    "Sinyal": g.action,
-                    "Skor": g.composite_score,
-                    "30G Trend": [round(float(x), 4) for x in s.df["Close"].tail(30).tolist()],
-                    "Fiyat": s.last_price,
-                    "Birim": s.currency,
-                    "Günlük %": s.change_pct,
-                    "RSI": g.rsi_14,
-                    "Stop-Loss": g.stop_loss,
-                    "Take-Profit": g.take_profit,
+                    "Sembol": s.symbol, "Varlık": s.name, "Piyasa": s.market_group,
+                    "Kategori": s.category, "Katılım": "Evet" if s.is_katilim else "Hayır",
+                    "Sinyal": g.action, "Skor": g.composite_score, "Fiyat": s.last_price,
+                    "Birim": s.currency, "Günlük %": s.change_pct, "RSI": g.rsi_14,
+                    "Stop-Loss": g.stop_loss, "Take-Profit": g.take_profit,
                 }
                 for s, g in matched
             ])
-            with p_cols[-1]:
-                st.download_button(
-                    "CSV İndir",
-                    data=tbl_df.drop(columns=["30G Trend"], errors="ignore").to_csv(index=False).encode("utf-8-sig"),
-                    file_name=f"alpquant_kesfet_{datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                )
+            lh_3.download_button(
+                "CSV İndir", data=csv_export.to_csv(index=False).encode("utf-8-sig"),
+                file_name=f"alpquant_kesfet_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv", use_container_width=True,
+            )
 
-            st.caption(f"{len(matched):,} varlık listeleniyor — Detay ekranını açmak için herhangi bir satıra tıklayın.")
-            row_idx = render_sparkline_table(tbl_df, height=530)
-            if row_idx is not None and 0 <= row_idx < len(matched):
-                open_detail(matched[row_idx][0].symbol)
-                st.rerun()
+            if view_mode == "Şık Liste":
+                page_size = 20
+                total_pages = max(1, math.ceil(len(matched) / page_size))
+                cur_pg = min(max(1, int(st.session_state.get("kesfet_page", 1))), total_pages)
+                slice_items = matched[(cur_pg - 1) * page_size : cur_pg * page_size]
+
+                disc_rows = []
+                for s, g in slice_items:
+                    dec = 4 if s.last_price < 10 else 2
+                    kat_badge = "<span style='color:#34D399; font-size:10px; margin-left:5px;'>● Katılım</span>" if s.is_katilim else ""
+                    sc_bar = min(100, max(5, int(g.composite_score)))
+                    sc_col = "#10B981" if g.composite_score >= 70 else ("#3B82F6" if g.composite_score >= 55 else "#64748B")
+                    disc_rows.append(
+                        f"<tr style='border-bottom:1px solid rgba(148,163,184,0.09);'>"
+                        f"<td style='padding:12px 16px;'>"
+                        f"<div style='font-size:14px; font-weight:700; color:#F8FAFC;'>{html.escape(s.symbol)}{kat_badge}</div>"
+                        f"<div style='font-size:11.5px; color:#64748B; margin-top:2px;'>{html.escape(s.name[:40])} · {html.escape(s.category)}</div>"
+                        f"</td>"
+                        f"<td style='padding:12px 12px; font-family:JetBrains Mono,monospace;'>"
+                        f"<div style='font-size:13.5px; font-weight:600; color:#F8FAFC;'>{s.last_price:,.{dec}f} {s.currency}</div>"
+                        f"<div style='font-size:11px; color:{'#10B981' if s.change_pct >= 0 else '#EF4444'}; margin-top:2px;'>{s.change_pct:+.2f}%</div>"
+                        f"</td>"
+                        f"<td style='padding:12px 12px;'>"
+                        f"<div style='font-family:JetBrains Mono,monospace; font-size:12.5px; font-weight:600; color:#E2E8F0;'>{g.composite_score:.1f}</div>"
+                        f"<div style='height:4px; width:76px; background:#1E293B; border-radius:99px; margin-top:5px; overflow:hidden;'>"
+                        f"<div style='height:100%; width:{sc_bar}%; background:{sc_col}; border-radius:99px;'></div></div>"
+                        f"</td>"
+                        f"<td style='padding:12px 12px; font-family:JetBrains Mono,monospace; font-size:12.5px; color:#CBD5E1;'>{g.rsi_14:.1f}</td>"
+                        f"<td style='padding:12px 12px; font-family:JetBrains Mono,monospace; font-size:11.5px;'>"
+                        f"<span style='color:#FCA5A5;'>SL {g.stop_loss:,.{dec}f}</span><br><span style='color:#6EE7B7;'>TP {g.take_profit:,.{dec}f}</span>"
+                        f"</td>"
+                        f"<td style='padding:12px 16px; text-align:right;'><span class='{action_pill_class(g.action)}'>{html.escape(g.action)}</span></td>"
+                        f"</tr>"
+                    )
+                render_html(
+                    f"""
+                    <div style="background:#111622; border:1px solid rgba(148,163,184,0.13); border-radius:14px; overflow-x:auto; margin-bottom:12px;">
+                        <table style="width:100%; border-collapse:collapse; text-align:left;">
+                            <thead>
+                                <tr style="background:#151C2C; border-bottom:1px solid rgba(148,163,184,0.13); color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.04em;">
+                                    <th style="padding:11px 16px;">Varlık</th>
+                                    <th style="padding:11px 12px;">Fiyat / Günlük</th>
+                                    <th style="padding:11px 12px;">Skor</th>
+                                    <th style="padding:11px 12px;">RSI-14</th>
+                                    <th style="padding:11px 12px;">Stop / Hedef</th>
+                                    <th style="padding:11px 16px; text-align:right;">Sinyal</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(disc_rows)}</tbody>
+                        </table>
+                    </div>
+                    """
+                )
+                # Quick Open Bar + Clean Pagination
+                qb1, qb2, qb3, qb4, qb5 = st.columns([2.5, 1.15, 0.9, 0.75, 0.75], gap="small")
+                quick_sym = qb1.selectbox(
+                    "Varlık Aç", options=[s.symbol for s, _ in slice_items],
+                    format_func=lambda sym: f"{sym} — {snapshots[sym].name[:30]}",
+                    label_visibility="collapsed",
+                )
+                if qb2.button("Detayını Aç →", type="primary", use_container_width=True):
+                    open_detail(quick_sym)
+                    st.rerun()
+                qb3.caption(f"Sayfa {cur_pg}/{total_pages}")
+                if qb4.button("← Önceki", disabled=(cur_pg <= 1), use_container_width=True):
+                    st.session_state["kesfet_page"] = cur_pg - 1
+                    st.rerun()
+                if qb5.button("Sonraki →", disabled=(cur_pg >= total_pages), use_container_width=True):
+                    st.session_state["kesfet_page"] = cur_pg + 1
+                    st.rerun()
+            else:
+                tbl_df = pd.DataFrame([
+                    {
+                        "Sembol": s.symbol, "Varlık": s.name[:34], "Piyasa": s.market_group,
+                        "Katılım": "✓" if s.is_katilim else "—", "Sinyal": g.action,
+                        "Skor": g.composite_score,
+                        "30G Trend": [round(float(x), 4) for x in s.df["Close"].tail(30).tolist()],
+                        "Fiyat": s.last_price, "Birim": s.currency, "Günlük %": s.change_pct,
+                        "RSI": g.rsi_14, "Stop-Loss": g.stop_loss, "Take-Profit": g.take_profit,
+                    }
+                    for s, g in matched
+                ])
+                row_idx = render_sparkline_table(tbl_df, height=510)
+                if row_idx is not None and 0 <= row_idx < len(matched):
+                    open_detail(matched[row_idx][0].symbol)
+                    st.rerun()
         elif not raw_q:
             st.info("Seçili filtrelere uygun varlık bulunamadı.")
 
@@ -4181,6 +4443,7 @@ def main() -> None:
                     st.session_state.portfolio_holdings = holdings
                     if p_sym not in st.session_state.basket:
                         st.session_state.basket = list(st.session_state.basket) + [p_sym]
+                    save_persistent_state()
                     st.success(f"{p_sym} ({float(in_qty):,.0f} adet @ {float(in_cost):,.4f}) kaydedildi.")
                     st.rerun()
 
@@ -4342,8 +4605,14 @@ def main() -> None:
                                     </div>
                                     <span class="aq-mono" style="font-size:12.5px; color:{p_col}; font-weight:600;">{p['pnl_pct']:+.2f}% ({p['pnl_tl']:+,.0f} ₺)</span>
                                 </div>
-                                <div style="font-size:12.5px; color:#CBD5E1; line-height:1.55; margin-top:8px;">
-                                    {html.escape(p['advice'])}
+                                <div style="font-size:12.5px; color:#E2E8F0; line-height:1.55; margin-top:8px;">
+                                    <b>Masa Planı:</b> {html.escape(p['advice'])}
+                                </div>
+                                <div style="font-size:11.5px; color:#94A3B8; margin-top:5px;">
+                                    <b>Gerekçe:</b> {html.escape(p['rationale'])}
+                                </div>
+                                <div style="font-size:12px; color:#CBD5E1; background:#161D2E; border-left:2px solid #8B5CF6; padding:7px 10px; border-radius:6px; margin-top:8px; line-height:1.45;">
+                                    <b style="color:#C4B5FD;">Psikolojik Değerlendirme:</b> {html.escape(p['psych_note'])}
                                 </div>
                                 <div class="aq-row-between" style="margin-top:9px; padding-top:8px; border-top:1px solid rgba(148,163,184,0.10); font-size:11.5px; color:#94A3B8; font-family:'JetBrains Mono',monospace;">
                                     <span>Maliyet: {p['avg_cost']:,.{dec}f} → Güncel: {p['last_price']:,.{dec}f}</span>
@@ -4356,7 +4625,24 @@ def main() -> None:
                 with c_donut:
                     render_html("<div class='aq-h2'>Portföy Dağılımı</div>")
                     st.plotly_chart(build_portfolio_donut(pos_list, height=260), use_container_width=True, key="v72_donut")
-                    st.caption("Maliyet veya lot güncellemek için sağ üstteki '+ Pozisyon Ekle / Düzenle' butonunu kullanabilirsiniz.")
+                    st.caption("Portföyünüz otomatik olarak kaydedilir ve yenilemelerde korunur. Cihazlar arası taşımak için yedek alabilirsiniz.")
+                    backup_json = json.dumps({"basket": st.session_state.basket, "portfolio_holdings": st.session_state.portfolio_holdings}, ensure_ascii=False, indent=2)
+                    st.download_button(
+                        "Portföy Yedeği İndir (JSON)", data=backup_json.encode("utf-8"),
+                        file_name="alpquant_portfoy_yedek.json", mime="application/json", use_container_width=True,
+                    )
+                    up_file = st.file_uploader("Yedekten Yükle (JSON)", type=["json"], label_visibility="collapsed")
+                    if up_file is not None:
+                        try:
+                            loaded = json.loads(up_file.read().decode("utf-8"))
+                            if isinstance(loaded, dict) and loaded.get("portfolio_holdings"):
+                                st.session_state.portfolio_holdings = loaded["portfolio_holdings"]
+                                st.session_state.basket = loaded.get("basket") or list(loaded["portfolio_holdings"].keys())
+                                save_persistent_state()
+                                st.success("Portföy yedeği başarıyla yüklendi.")
+                                st.rerun()
+                        except Exception:
+                            st.warning("Geçerli bir AlpQuant JSON yedeği yükleyin.")
 
             with pt_bt:
                 basket_snaps = [p["snap"] for p in pos_list]
