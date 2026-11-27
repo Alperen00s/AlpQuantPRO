@@ -106,6 +106,7 @@ class SuitabilityProfile:
     approved_levels: List[int] = field(default_factory=lambda: [1, 2, 3, 4, 5])
     max_single_weight: float = 0.25
     completed_at: str = field(default_factory=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"))
+    spk_completed: bool = False
 
 
 @dataclass
@@ -3338,6 +3339,231 @@ def _decode_holdings_param(raw: str) -> Tuple[List[str], Dict[str, Dict[str, flo
     return basket, holdings
 
 
+import sqlite3
+
+LOCAL_DB_PATH = Path(__file__).resolve().parent / ".alpquant_users.db"
+
+
+class CloudAuthStore:
+    """
+    Zero-cost multi-user account & portfolio persistence layer:
+      - Mode A (Production): Supabase Free Tier (Auth + Postgres `user_portfolios` table) via st.secrets.
+      - Mode B (Zero-config Fallback): Local SQLite + PBKDF2-HMAC-SHA256 salted password hashing.
+    """
+
+    @staticmethod
+    def _get_supabase_cfg() -> Tuple[str, str]:
+        url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+        key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
+        try:
+            if hasattr(st, "secrets"):
+                if "SUPABASE_URL" in st.secrets:
+                    url = str(st.secrets["SUPABASE_URL"]).strip().rstrip("/")
+                if "SUPABASE_ANON_KEY" in st.secrets:
+                    key = str(st.secrets["SUPABASE_ANON_KEY"]).strip()
+        except Exception:
+            pass
+        return url, key
+
+    @classmethod
+    def is_cloud_enabled(cls) -> bool:
+        url, key = cls._get_supabase_cfg()
+        return bool(url and key)
+
+    @staticmethod
+    def _init_sqlite() -> None:
+        conn = sqlite3.connect(str(LOCAL_DB_PATH))
+        try:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, pw_hash TEXT NOT NULL, salt TEXT NOT NULL, full_name TEXT DEFAULT '', created_at TEXT NOT NULL)"
+            )
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS portfolios (email TEXT PRIMARY KEY, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _hash_password(password: str, salt: Optional[str] = None) -> Tuple[str, str]:
+        s = salt or hashlib.sha256(os.urandom(16)).hexdigest()[:24]
+        dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), s.encode("utf-8"), 120_000)
+        return dk.hex(), s
+
+    @classmethod
+    def register_user(cls, email: str, password: str, full_name: str = "") -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        em = email.strip().lower()
+        if "@" not in em or "." not in em:
+            return False, "Geçerli bir e-posta adresi girin.", None
+        if len(password) < 6:
+            return False, "Şifre en az 6 karakter olmalıdır.", None
+
+        url, key = cls._get_supabase_cfg()
+        if url and key:
+            try:
+                req = urllib.request.Request(
+                    f"{url}/auth/v1/signup",
+                    data=json.dumps({"email": em, "password": password, "data": {"full_name": full_name}}).encode("utf-8"),
+                    headers={"apikey": key, "Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                tok = data.get("access_token") or ""
+                uid = (data.get("user") or {}).get("id") or em
+                if not tok:
+                    return True, "Kayıt oluşturuldu! E-postanıza gelen onay linkine tıkladıktan sonra giriş yapabilirsiniz.", None
+                return True, "Hesabınız bulutta oluşturuldu.", {"email": em, "user_id": uid, "access_token": tok, "name": full_name or em.split("@")[0]}
+            except urllib.error.HTTPError as he:
+                err_body = he.read().decode("utf-8", errors="ignore")
+                return False, f"Kayıt hatası: {err_body[:140]}", None
+            except Exception as exc:
+                return False, f"Bulut bağlantı hatası: {exc}", None
+
+        cls._init_sqlite()
+        conn = sqlite3.connect(str(LOCAL_DB_PATH))
+        try:
+            if conn.execute("SELECT email FROM users WHERE email = ?", (em,)).fetchone():
+                return False, "Bu e-posta adresi zaten kayıtlı. Giriş yapabilirsiniz.", None
+            pw_h, salt = cls._hash_password(password)
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute("INSERT INTO users (email, pw_hash, salt, full_name, created_at) VALUES (?, ?, ?, ?, ?)", (em, pw_h, salt, full_name.strip(), now))
+            conn.commit()
+            return True, "Hesabınız oluşturuldu.", {"email": em, "user_id": em, "access_token": "", "name": full_name.strip() or em.split("@")[0]}
+        finally:
+            conn.close()
+
+    @classmethod
+    def login_user(cls, email: str, password: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        em = email.strip().lower()
+        if not em or not password:
+            return False, "E-posta ve şifre boş bırakılamaz.", None
+
+        url, key = cls._get_supabase_cfg()
+        if url and key:
+            try:
+                req = urllib.request.Request(
+                    f"{url}/auth/v1/token?grant_type=password",
+                    data=json.dumps({"email": em, "password": password}).encode("utf-8"),
+                    headers={"apikey": key, "Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                tok = data.get("access_token") or ""
+                user_obj = data.get("user") or {}
+                uid = user_obj.get("id") or em
+                meta_name = (user_obj.get("user_metadata") or {}).get("full_name") or em.split("@")[0]
+                return True, "Bulut hesabınıza giriş yapıldı.", {"email": em, "user_id": uid, "access_token": tok, "name": meta_name}
+            except urllib.error.HTTPError:
+                return False, "E-posta veya şifre hatalı (veya e-posta doğrulaması bekleniyor).", None
+            except Exception as exc:
+                return False, f"Giriş bağlantı hatası: {exc}", None
+
+        cls._init_sqlite()
+        conn = sqlite3.connect(str(LOCAL_DB_PATH))
+        try:
+            row = conn.execute("SELECT pw_hash, salt, full_name FROM users WHERE email = ?", (em,)).fetchone()
+            if not row:
+                return False, "Bu e-posta ile kayıtlı hesap bulunamadı.", None
+            pw_h, _ = cls._hash_password(password, salt=row[1])
+            if pw_h != row[0]:
+                return False, "Şifre hatalı.", None
+            return True, "Hesabınıza giriş yapıldı.", {"email": em, "user_id": em, "access_token": "", "name": row[2] or em.split("@")[0]}
+        finally:
+            conn.close()
+
+    @classmethod
+    def save_user_portfolio(cls, user: Dict[str, Any], payload: Dict[str, Any]) -> None:
+        em = user.get("email", "")
+        uid = user.get("user_id", em)
+        tok = user.get("access_token", "")
+        url, key = cls._get_supabase_cfg()
+        if url and key and tok:
+            try:
+                body = {"user_id": uid, "email": em, "portfolio_json": payload, "updated_at": datetime.now(timezone.utc).isoformat()}
+                req = urllib.request.Request(
+                    f"{url}/rest/v1/user_portfolios?on_conflict=user_id",
+                    data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+                    headers={"apikey": key, "Authorization": f"Bearer {tok}", "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=5):
+                    return
+            except Exception:
+                pass
+        if em:
+            cls._init_sqlite()
+            conn = sqlite3.connect(str(LOCAL_DB_PATH))
+            try:
+                conn.execute(
+                    "INSERT INTO portfolios (email, payload_json, updated_at) VALUES (?, ?, ?) "
+                    "ON CONFLICT(email) DO UPDATE SET payload_json=excluded.payload_json, updated_at=excluded.updated_at",
+                    (em, json.dumps(payload, ensure_ascii=False), datetime.now(timezone.utc).isoformat()),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+    @classmethod
+    def load_user_portfolio(cls, user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        em = user.get("email", "")
+        uid = user.get("user_id", em)
+        tok = user.get("access_token", "")
+        url, key = cls._get_supabase_cfg()
+        if url and key and tok:
+            try:
+                req = urllib.request.Request(
+                    f"{url}/rest/v1/user_portfolios?user_id=eq.{urllib.parse.quote(str(uid))}&select=portfolio_json",
+                    headers={"apikey": key, "Authorization": f"Bearer {tok}"},
+                    method="GET",
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    rows = json.loads(resp.read().decode("utf-8"))
+                if rows and isinstance(rows[0].get("portfolio_json"), dict):
+                    return rows[0]["portfolio_json"]
+            except Exception:
+                pass
+        if em:
+            cls._init_sqlite()
+            conn = sqlite3.connect(str(LOCAL_DB_PATH))
+            try:
+                row = conn.execute("SELECT payload_json FROM portfolios WHERE email = ?", (em,)).fetchone()
+                if row:
+                    return json.loads(row[0])
+            finally:
+                conn.close()
+        return None
+
+
+def apply_loaded_payload_to_session(data: Dict[str, Any]) -> None:
+    if not isinstance(data, dict):
+        return
+    if data.get("basket"):
+        st.session_state.basket = list(data["basket"])
+    if data.get("portfolio_holdings"):
+        st.session_state.portfolio_holdings = dict(data["portfolio_holdings"])
+    if data.get("total_capital_tl"):
+        st.session_state.total_capital_tl = float(data["total_capital_tl"])
+    if "spk_completed" in data:
+        st.session_state.spk_completed = bool(data["spk_completed"])
+    if data.get("spk_level"):
+        rl = int(data["spk_level"])
+        lbls = {
+            1: "Çok Düşük Risk (Muhafazakâr)", 2: "Düşük-Orta Risk (Temkinli)",
+            3: "Orta Risk (Dengeli)", 4: "Yüksek Risk (Büyüme Odaklı)",
+            5: "Çok Yüksek Risk (Agresif / Profesyonel)",
+        }
+        spk_done = bool(data.get("spk_completed", True))
+        st.session_state.spk_completed = spk_done
+        st.session_state.suitability_profile = SuitabilityProfile(
+            user_id=(st.session_state.get("auth_user") or {}).get("email", "yatirimci"),
+            risk_score=rl, risk_label=lbls.get(rl, lbls[5]),
+            approved_levels=list(range(1, rl + 1)), max_single_weight=0.10 + rl * 0.03,
+            spk_completed=spk_done,
+        )
+
+
 def save_persistent_state() -> None:
     """Persists portfolio holdings, basket, and SPK profile to local JSON and URL query params."""
     payload = {
@@ -3345,7 +3571,11 @@ def save_persistent_state() -> None:
         "portfolio_holdings": dict(st.session_state.get("portfolio_holdings", {})),
         "total_capital_tl": float(st.session_state.get("total_capital_tl", 250_000.0)),
         "spk_level": int(getattr(st.session_state.get("suitability_profile"), "risk_score", 5)),
+        "spk_completed": bool(st.session_state.get("spk_completed", False)),
     }
+    user = st.session_state.get("auth_user")
+    if user:
+        CloudAuthStore.save_user_portfolio(user, payload)
     try:
         PORTFOLIO_STORE_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception:
@@ -3383,6 +3613,7 @@ def load_persistent_state() -> Optional[Dict[str, Any]]:
 
 def init_session_state() -> None:
     defaults = {
+        "spk_completed": False,
         "workspace": "Piyasalar",       # Piyasalar | Keşfet | Portföyüm
         "detail_symbol": None,          # None = show workspace; "THYAO" = open clean Asset Detail View
         "home_lens": "Tümü",
@@ -3438,6 +3669,7 @@ def init_session_state() -> None:
                     3: "Orta Risk (Dengeli)", 4: "Yüksek Risk (Büyüme Odaklı)",
                     5: "Çok Yüksek Risk (Agresif / Profesyonel)",
                 }
+                defaults["spk_completed"] = bool(saved.get("spk_completed", True))
                 defaults["suitability_profile"] = SuitabilityProfile(
                     risk_score=rl, risk_label=lbls.get(rl, lbls[5]),
                     approved_levels=list(range(1, rl + 1)), max_single_weight=0.10 + rl * 0.03,
@@ -3917,32 +4149,53 @@ def main() -> None:
         st.rerun()
 
     with tb_cfg:
-        with safe_popover(f"SPK Lv.{profile.risk_score} · ⚙", use_container_width=True):
-            pt1, pt2 = st.tabs(["SPK Profili", "Sermaye & Veri"])
-            with pt1:
-                st.caption(f"Aktif Profil: **Seviye {profile.risk_score}/5** — {profile.risk_label}")
-                with st.form("v7_spk_form", clear_on_submit=False):
-                    q1 = st.selectbox("Yatırım Vadesi", ["0-1 Yıl (Kısa)", "1-3 Yıl (Orta)", "3+ Yıl (Uzun)"], index=2)
-                    q2 = st.selectbox("Kayıp Toleransı", ["Anapara Koruma", "%10-15 Dalgalanma", "%25+ Yüksek Getiri"], index=2)
-                    q3 = st.selectbox("Piyasa Tecrübesi", ["Başlangıç", "Orta (Hisse/Fon)", "Profesyonel"], index=2)
-                    if st.form_submit_button("Profili Kaydet", use_container_width=True):
-                        pts = (
-                            {"0-1 Yıl (Kısa)": 1, "1-3 Yıl (Orta)": 2, "3+ Yıl (Uzun)": 3}[q1]
-                            + {"Anapara Koruma": 1, "%10-15 Dalgalanma": 2, "%25+ Yüksek Getiri": 3}[q2]
-                            + {"Başlangıç": 1, "Orta (Hisse/Fon)": 2, "Profesyonel": 3}[q3]
-                        )
-                        rl = 2 if pts <= 4 else (3 if pts <= 6 else (4 if pts <= 7 else 5))
-                        lbls = {
-                            2: "Düşük-Orta Risk (Temkinli)", 3: "Orta Risk (Dengeli)",
-                            4: "Yüksek Risk (Büyüme Odaklı)", 5: "Çok Yüksek Risk (Agresif / Profesyonel)",
-                        }
-                        st.session_state.suitability_profile = SuitabilityProfile(
-                            user_id=profile.user_id, risk_score=rl, risk_label=lbls[rl],
-                            approved_levels=list(range(1, rl + 1)), max_single_weight=0.10 + rl * 0.03,
-                        )
-                        save_persistent_state()
-                        st.success(f"SPK Seviye {rl}/5 kaydedildi.")
+        auth_user = st.session_state.get("auth_user")
+        cfg_label = f"👤 {auth_user['name'][:12]}" if auth_user else "Giriş / Hesap"
+        with safe_popover(cfg_label, use_container_width=True):
+            pt_acc, pt2 = st.tabs(["Hesabım", "Sermaye & Veri"])
+            with pt_acc:
+                if auth_user:
+                    mode_txt = "Supabase Bulut Senkronu Aktif" if CloudAuthStore.is_cloud_enabled() else "Yerel Hesap Veritabanı Aktif"
+                    st.success(f"**{auth_user['name']}** ({auth_user['email']})")
+                    st.caption(mode_txt + " · Portföyünüz ve SPK profiliniz otomatik kaydedilir.")
+                    if st.button("Çıkış Yap", use_container_width=True, key="v82_logout_btn"):
+                        st.session_state.auth_user = None
                         st.rerun()
+                else:
+                    auth_mode = st.radio("İşlem", ["Giriş Yap", "Ücretsiz Hesap Aç"], horizontal=True, label_visibility="collapsed", key="v82_auth_mode")
+                    if auth_mode == "Ücretsiz Hesap Aç":
+                        reg_name = st.text_input("Ad Soyad", placeholder="Ör. Ahmet Yılmaz", key="v82_reg_name")
+                        reg_email = st.text_input("E-Posta", placeholder="ornek@eposta.com", key="v82_reg_email")
+                        reg_pw = st.text_input("Şifre (min 6 karakter)", type="password", key="v82_reg_pw")
+                        if st.button("Hesabı Oluştur", type="primary", use_container_width=True, key="v82_reg_btn"):
+                            ok, msg, u_obj = CloudAuthStore.register_user(reg_email, reg_pw, reg_name)
+                            if ok and u_obj:
+                                st.session_state.auth_user = u_obj
+                                st.session_state.spk_completed = False
+                                save_persistent_state()
+                                st.success(msg)
+                                st.rerun()
+                            elif ok:
+                                st.info(msg)
+                            else:
+                                st.warning(msg)
+                    else:
+                        log_email = st.text_input("E-Posta", placeholder="ornek@eposta.com", key="v82_log_email")
+                        log_pw = st.text_input("Şifre", type="password", key="v82_log_pw")
+                        if st.button("Giriş Yap", type="primary", use_container_width=True, key="v82_log_btn"):
+                            ok, msg, u_obj = CloudAuthStore.login_user(log_email, log_pw)
+                            if ok and u_obj:
+                                st.session_state.auth_user = u_obj
+                                loaded_pf = CloudAuthStore.load_user_portfolio(u_obj)
+                                if loaded_pf:
+                                    apply_loaded_payload_to_session(loaded_pf)
+                                else:
+                                    st.session_state.spk_completed = False
+                                    save_persistent_state()
+                                st.success(msg)
+                                st.rerun()
+                            else:
+                                st.warning(msg)
             with pt2:
                 st.session_state.total_capital_tl = st.number_input(
                     "Portföy Sermayesi (TL)", 10_000.0, 500_000_000.0, float(st.session_state.total_capital_tl), step=25_000.0
@@ -3960,6 +4213,58 @@ def main() -> None:
                 st.session_state.smtp_pass = ec2.text_input("Uygulama Şifresi", value=st.session_state.smtp_pass, type="password")
 
     render_html("<div class='aq-divider'></div>")
+
+    # -------------------------------------------------------------------------
+    # ONE-TIME MANDATORY SPK SUITABILITY ONBOARDING (ONLY ONCE PER ACCOUNT)
+    # -------------------------------------------------------------------------
+    if st.session_state.get("auth_user") and not st.session_state.get("spk_completed", False):
+        u_info = st.session_state["auth_user"]
+        _, gate_col, _ = st.columns([0.8, 2.4, 0.8])
+        with gate_col:
+            render_html(
+                f"""
+                <div class="aq-card" style="padding:24px 26px; border-color:rgba(59,130,246,0.35);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span class="aq-pill aq-pill-blue">Zorunlu İlk Adım · Tek Seferlik</span>
+                        <span style="font-size:12px; color:#64748B;">{html.escape(u_info['email'])}</span>
+                    </div>
+                    <div style="font-size:20px; font-weight:700; color:#F8FAFC; letter-spacing:-0.015em;">
+                        Hoş Geldiniz, {html.escape(u_info['name'])} — SPK Yatırımcı Uygunluk Testi
+                    </div>
+                    <div style="font-size:13px; color:#94A3B8; margin-top:6px; line-height:1.55;">
+                        Size uygun risk seviyesindeki varlıkları ve masa tavsiyelerini kişiselleştirmek için bu kısa testi hesabınızla birlikte <b>yalnızca bir kez</b> tamamlamanız yeterlidir. Tamamladıktan sonra bir daha karşınıza çıkmayacaktır.
+                    </div>
+                </div>
+                """
+            )
+            with st.form("v82_onetime_spk_gate", clear_on_submit=False):
+                q1 = st.selectbox("1. Yatırım Vadeniz", ["0-1 Yıl (Kısa Vade)", "1-3 Yıl (Orta Vade)", "3+ Yıl (Uzun Vade)"], index=1)
+                q2 = st.selectbox("2. Olası Değer Kaybı Toleransınız", ["Anapara Koruma (Maks. %5)", "Dengeli (%10–15 Dalgalanma)", "Yüksek Getiri Odaklı (%25+ Dalgalanma)"], index=1)
+                q3 = st.selectbox("3. Piyasa & Ürün Tecrübeniz", ["Başlangıç (Mevduat / Para Piyasası)", "Orta (Hisse Senedi / TEFAS Fonları)", "İleri / Profesyonel (Türev, Kripto, Kaldıraç)"], index=1)
+                q4 = st.selectbox("4. Gelir & Likidite İhtiyacınız", ["Yatırımdan düzenli nakit çıkışı gerekebilir", "Acil durum fonum ayrı, orta vadede dokunmam", "Tamamı uzun vadeli büyüme sermayesi"], index=1)
+                if st.form_submit_button("Risk Profilimi Kaydet ve Platforma Geç →", type="primary", use_container_width=True):
+                    pts = (
+                        {"0-1 Yıl (Kısa Vade)": 1, "1-3 Yıl (Orta Vade)": 2, "3+ Yıl (Uzun Vade)": 3}[q1]
+                        + {"Anapara Koruma (Maks. %5)": 1, "Dengeli (%10–15 Dalgalanma)": 2, "Yüksek Getiri Odaklı (%25+ Dalgalanma)": 3}[q2]
+                        + {"Başlangıç (Mevduat / Para Piyasası)": 1, "Orta (Hisse Senedi / TEFAS Fonları)": 2, "İleri / Profesyonel (Türev, Kripto, Kaldıraç)": 3}[q3]
+                        + {"Yatırımdan düzenli nakit çıkışı gerekebilir": 1, "Acil durum fonum ayrı, orta vadede dokunmam": 2, "Tamamı uzun vadeli büyüme sermayesi": 3}[q4]
+                    )
+                    rl = 1 if pts <= 5 else (2 if pts <= 7 else (3 if pts <= 9 else (4 if pts <= 11 else 5)))
+                    lbls = {
+                        1: "Çok Düşük Risk (Muhafazakâr)", 2: "Düşük-Orta Risk (Temkinli)",
+                        3: "Orta Risk (Dengeli)", 4: "Yüksek Risk (Büyüme Odaklı)",
+                        5: "Çok Yüksek Risk (Agresif / Profesyonel)",
+                    }
+                    st.session_state.suitability_profile = SuitabilityProfile(
+                        user_id=u_info["email"], risk_score=rl, risk_label=lbls[rl],
+                        approved_levels=list(range(1, rl + 1)), max_single_weight=0.10 + rl * 0.03,
+                        spk_completed=True,
+                    )
+                    st.session_state.spk_completed = True
+                    save_persistent_state()
+                    st.success(f"SPK Seviye {rl}/5 profiliniz hesabınıza kalıcı olarak kaydedildi.")
+                    st.rerun()
+        return
 
     # -------------------------------------------------------------------------
     # IF AN ASSET IS OPENED -> RENDER CLEAN DISTRACTION-FREE DETAIL VIEW
@@ -4625,24 +4930,36 @@ def main() -> None:
                 with c_donut:
                     render_html("<div class='aq-h2'>Portföy Dağılımı</div>")
                     st.plotly_chart(build_portfolio_donut(pos_list, height=260), use_container_width=True, key="v72_donut")
-                    st.caption("Portföyünüz otomatik olarak kaydedilir ve yenilemelerde korunur. Cihazlar arası taşımak için yedek alabilirsiniz.")
-                    backup_json = json.dumps({"basket": st.session_state.basket, "portfolio_holdings": st.session_state.portfolio_holdings}, ensure_ascii=False, indent=2)
-                    st.download_button(
-                        "Portföy Yedeği İndir (JSON)", data=backup_json.encode("utf-8"),
-                        file_name="alpquant_portfoy_yedek.json", mime="application/json", use_container_width=True,
-                    )
-                    up_file = st.file_uploader("Yedekten Yükle (JSON)", type=["json"], label_visibility="collapsed")
-                    if up_file is not None:
-                        try:
-                            loaded = json.loads(up_file.read().decode("utf-8"))
-                            if isinstance(loaded, dict) and loaded.get("portfolio_holdings"):
-                                st.session_state.portfolio_holdings = loaded["portfolio_holdings"]
-                                st.session_state.basket = loaded.get("basket") or list(loaded["portfolio_holdings"].keys())
-                                save_persistent_state()
-                                st.success("Portföy yedeği başarıyla yüklendi.")
-                                st.rerun()
-                        except Exception:
-                            st.warning("Geçerli bir AlpQuant JSON yedeği yükleyin.")
+                    if st.session_state.get("auth_user"):
+                        u = st.session_state["auth_user"]
+                        sync_lbl = "Bulut Hesabı Aktif" if CloudAuthStore.is_cloud_enabled() else "Hesap Hafızası Aktif"
+                        render_html(
+                            f"""
+                            <div class="aq-card" style="padding:14px 16px; margin-top:8px;">
+                                <div class="aq-row-between">
+                                    <span style="font-size:13px; font-weight:600; color:#F8FAFC;">{html.escape(u['name'])}</span>
+                                    <span class="aq-pill aq-pill-buy">{sync_lbl}</span>
+                                </div>
+                                <div style="font-size:12px; color:#94A3B8; margin-top:6px; line-height:1.5;">
+                                    Portföyünüz ve SPK profiliniz <b>{html.escape(u['email'])}</b> hesabınıza otomatik kaydedilir.
+                                </div>
+                            </div>
+                            """
+                        )
+                    else:
+                        render_html(
+                            """
+                            <div class="aq-card" style="padding:14px 16px; margin-top:8px;">
+                                <div class="aq-row-between">
+                                    <span style="font-size:13px; font-weight:600; color:#F8FAFC;">Misafir Oturumu</span>
+                                    <span class="aq-pill aq-pill-blue">Ücretsiz Kayıt</span>
+                                </div>
+                                <div style="font-size:12px; color:#94A3B8; margin-top:6px; line-height:1.5;">
+                                    Portföyünüzü kalıcı saklamak için sağ üstteki <b>Giriş / Hesap</b> menüsünden ücretsiz hesap açabilirsiniz.
+                                </div>
+                            </div>
+                            """
+                        )
 
             with pt_bt:
                 basket_snaps = [p["snap"] for p in pos_list]
